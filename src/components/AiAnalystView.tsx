@@ -27,7 +27,8 @@ import {
   ExtractionException,
   AnalystMessage,
 } from '../types/procurement';
-import { generateDeterministicAnalystResponse } from '../services/procurementEngine';
+import { askAnalyst } from '../services/analystClient';
+import { ApiError, type Health } from '../services/extractionClient';
 import { TrustBadge } from './GovernanceUI';
 
 interface AiAnalystViewProps {
@@ -37,6 +38,8 @@ interface AiAnalystViewProps {
   questions: QuestionnaireQuestion[];
   responses: VendorQuestionnaireResponse[];
   exceptions: ExtractionException[];
+  usdToInrRate: number;
+  health?: Health | null;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -59,42 +62,39 @@ export const AiAnalystView: React.FC<AiAnalystViewProps> = ({
   questions,
   responses,
   exceptions,
+  usdToInrRate,
+  health,
 }) => {
-  const [messages, setMessages] = useState<AnalystMessage[]>(() => [
-    generateDeterministicAnalystResponse(
-      'What happens if we split the purchase among the cheapest quality-qualified vendors?',
-      lineItems,
-      vendors,
-      quoteCells,
-      questions,
-      responses,
-      exceptions
-    ),
-  ]);
+  const [messages, setMessages] = useState<AnalystMessage[]>([]);
   const [inputQuery, setInputQuery] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
 
-  const handleAskQuestion = (questionText: string) => {
+  const handleAskQuestion = async (questionText: string) => {
+    if (isThinking) return;
     const cleanQ = questionText.replace(/^\d+\.\s*/, '');
-    const userMsg: AnalystMessage = {
-      id: `usr-${Date.now()}`,
-      role: 'user',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      promptText: cleanQ,
-      isDemoSimulation: true,
-    };
-
-    const reply = generateDeterministicAnalystResponse(
-      cleanQ,
-      lineItems,
-      vendors,
-      quoteCells,
-      questions,
-      responses,
-      exceptions
-    );
-
-    setMessages((prev) => [...prev, userMsg, reply]);
+    const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const userMsg: AnalystMessage = { id: `usr-${Date.now()}`, role: 'user', timestamp: now(), promptText: cleanQ, isDemoSimulation: false };
+    setMessages((prev) => [...prev, userMsg]);
     setInputQuery('');
+    setIsThinking(true);
+    const history = messages
+      .filter((m) => m.role === 'user' || m.headlineAnswer)
+      .map((m) => ({ role: m.role, text: m.role === 'user' ? m.promptText : [m.headlineAnswer, ...(m.narrativeParagraphs ?? [])].join('\n') }));
+    try {
+      const r = await askAnalyst(cleanQ, history, { lineItems, vendors, quoteCells, questions, responses, exceptions, usdToInrRate });
+      const paras = r.answer.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+      const reply: AnalystMessage = {
+        id: `ast-${Date.now()}`, role: 'assistant', timestamp: now(), promptText: cleanQ, isDemoSimulation: false,
+        headlineAnswer: paras[0], narrativeParagraphs: paras.slice(1),
+        tables: r.tables, tableData: r.tables[0], toolTrace: r.toolTrace, ungroundedFigures: r.ungroundedFigures, model: r.model,
+      };
+      setMessages((prev) => [...prev, reply]);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'The analyst could not answer.';
+      setMessages((prev) => [...prev, { id: `err-${Date.now()}`, role: 'assistant', timestamp: now(), promptText: cleanQ, isDemoSimulation: false, error: msg }]);
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   const handleExportAnalysisCsv = (msg: AnalystMessage) => {
@@ -133,16 +133,20 @@ export const AiAnalystView: React.FC<AiAnalystViewProps> = ({
             </h1>
             <TrustBadge
               type="ai_generated"
-              labelOverride="Deterministic Dataset Engine (Demo Mode)"
+              labelOverride={
+                health?.aiConfigured && health.capabilities.analyst
+                  ? `Gemini tool-using analyst · ${health.model}`
+                  : 'Unavailable: server AI key not set'
+              }
             />
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Interrogate the 30-item dataset, conversion math, and qualification records using natural language
+            Ask questions in plain language. The AI chooses which controlled tools to run; every figure comes from deterministic code and can be traced to the tools listed under each answer
           </p>
         </div>
 
         <button
-          onClick={() => setMessages(messages.slice(0, 1))}
+          onClick={() => setMessages([])}
           className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-md inline-flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
         >
           <RotateCcw className="w-3.5 h-3.5" />
@@ -158,14 +162,14 @@ export const AiAnalystView: React.FC<AiAnalystViewProps> = ({
             <h2 className="text-xs font-semibold text-slate-900">
               Suggested Analytical Queries (10)
             </h2>
-            <span className="text-[10px] font-mono text-slate-400">150 Cells Indexed</span>
+            <span className="text-[10px] font-mono text-slate-400">{quoteCells.length} cells</span>
           </div>
 
           <div className="space-y-1">
             {SUGGESTED_QUESTIONS.map((q, idx) => (
               <button
                 key={q}
-                onClick={() => handleAskQuestion(q)}
+                onClick={() => void handleAskQuestion(q)}
                 className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-[#6161F5]/[0.05] hover:text-slate-900 rounded-md transition-colors flex items-start gap-2 cursor-pointer"
               >
                 <span className="font-mono text-[10px] text-slate-400 mt-0.5">
@@ -180,6 +184,11 @@ export const AiAnalystView: React.FC<AiAnalystViewProps> = ({
         {/* Right Column: Structured Analyst Feed & Prompt Input */}
         <div className="lg:col-span-8 bg-white border border-slate-200/90 rounded-lg flex flex-col h-[700px] overflow-hidden">
           <div className="flex-1 p-5 overflow-y-auto space-y-6">
+            {messages.length === 0 && !isThinking && (
+              <div className="text-xs text-slate-500 leading-relaxed">
+                No questions asked yet. Pick a suggested query or type your own. If no vendor document has been processed, the analyst will tell you there is nothing to analyse.
+              </div>
+            )}
             {messages.map((msg) => {
               if (msg.role === 'user') {
                 return (
@@ -190,6 +199,14 @@ export const AiAnalystView: React.FC<AiAnalystViewProps> = ({
                       </div>
                       <div className="font-medium">{msg.promptText}</div>
                     </div>
+                  </div>
+                );
+              }
+
+              if (msg.error) {
+                return (
+                  <div key={msg.id} className="border border-amber-200 bg-amber-50 rounded-lg p-4 text-xs text-amber-900">
+                    {msg.error} Nothing was calculated.
                   </div>
                 );
               }
@@ -234,36 +251,39 @@ export const AiAnalystView: React.FC<AiAnalystViewProps> = ({
                   {msg.narrativeParagraphs && (
                     <div className="space-y-2 text-slate-600 leading-relaxed">
                       {msg.narrativeParagraphs.map((p, i) => (
-                        <p key={i}>{p}</p>
+                        <p key={i} className="whitespace-pre-line">{p}</p>
                       ))}
                     </div>
                   )}
 
-                  {/* Structured Result Table */}
-                  {msg.tableData && (
-                    <div className="border border-slate-200/90 rounded-md overflow-x-auto">
+                  {/* Structured Result Tables (taken from tool output, never from model text) */}
+                  {(msg.tables ?? (msg.tableData ? [{ title: '', ...msg.tableData }] : [])).map((tb, tIdx) => (
+                    <div key={tIdx} className="border border-slate-200/90 rounded-md overflow-x-auto">
+                      {tb.title && <div className="px-3 py-1.5 text-[11px] font-medium text-slate-600 bg-slate-50/70 border-b border-slate-200">{tb.title}</div>}
                       <table className="w-full text-left border-collapse text-[11px]">
                         <thead>
                           <tr className="bg-slate-50 border-b border-slate-200 font-medium text-slate-500">
-                            {msg.tableData.headers.map((h, i) => (
-                              <th key={i} className="py-2 px-3">
-                                {h}
-                              </th>
+                            {tb.headers.map((h, i) => (
+                              <th key={i} className="py-2 px-3">{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/70">
-                          {msg.tableData.rows.map((r, rIdx) => (
+                          {tb.rows.map((r, rIdx) => (
                             <tr key={rIdx} className="hover:bg-slate-50/70">
                               {r.map((cellVal, cIdx) => (
-                                <td key={cIdx} className="py-2 px-3 font-mono text-slate-800">
-                                  {cellVal}
-                                </td>
+                                <td key={cIdx} className="py-2 px-3 font-mono text-slate-800">{cellVal}</td>
                               ))}
                             </tr>
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  ))}
+
+                  {msg.ungroundedFigures && msg.ungroundedFigures.length > 0 && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-[11px] text-amber-900">
+                      Check before relying on this: the figure(s) {msg.ungroundedFigures.join(', ')} appear in the answer but were not found in any tool result. Treat them as unverified.
                     </div>
                   )}
 
@@ -304,6 +324,21 @@ export const AiAnalystView: React.FC<AiAnalystViewProps> = ({
 
                   {/* Calculation Explanations, Sources, Assumptions, Risks */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                    {msg.toolTrace && (
+                      <div className="p-3 bg-slate-50/70 border border-slate-200/80 rounded-md space-y-1 md:col-span-2">
+                        <div className="font-semibold text-slate-800 flex items-center gap-1.5 text-[11px]">
+                          <Calculator className="w-3.5 h-3.5 text-[#6161F5]" />
+                          <span>Tools the analyst ran{msg.model ? ` (${msg.model})` : ''}</span>
+                        </div>
+                        <ul className="space-y-1 text-[11px] font-mono text-slate-600">
+                          {msg.toolTrace.length === 0 && <li>• None. The answer did not use any data.</li>}
+                          {msg.toolTrace.map((t) => (
+                            <li key={t.id}>• {t.id} {t.name}({Object.keys(t.args).length ? JSON.stringify(t.args) : ''}) {t.ok ? '' : `— failed: ${t.error}`}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     {msg.calculationBreakdown && (
                       <div className="p-3 bg-slate-50/70 border border-slate-200/80 rounded-md space-y-1">
                         <div className="font-semibold text-slate-800 flex items-center gap-1.5 text-[11px]">
@@ -365,12 +400,14 @@ export const AiAnalystView: React.FC<AiAnalystViewProps> = ({
             })}
           </div>
 
+          {isThinking && <div className="px-5 pb-2 text-[11px] text-slate-500">Analyst is running tools…</div>}
+
           {/* Prompt Input Bar */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
               if (inputQuery.trim()) {
-                handleAskQuestion(inputQuery.trim());
+                void handleAskQuestion(inputQuery.trim());
               }
             }}
             className="p-3.5 border-t border-slate-200/80 bg-slate-50/50 flex items-center gap-2.5"

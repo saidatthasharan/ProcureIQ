@@ -23,6 +23,7 @@ import {
   ScenarioConfig,
 } from '../types/procurement';
 import {
+  calculateVendorQualification,
   evaluateScenario,
   formatInr,
   formatLakhs,
@@ -61,15 +62,10 @@ export const AwardRecommendationView: React.FC<AwardRecommendationViewProps> = (
   const [isEditingMemo, setIsEditingMemo] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEvidenceModal, setShowEvidenceModal] = useState(false);
-  const [executiveRationale, setExecutiveRationale] = useState(
-    'Recommend a multi-vendor best-of-breed split award across our 4 quality-qualified suppliers (EcoWrap Packaging, PrimePack Solutions, Global Corrugators Ltd., and Apex Packaging Industries) while enforcing hard disqualification on Southern Box Manufacturing due to lapsed ISO 9001 certification and insufficient 14 kg/cm² bursting strength capability. This allocation locks in 9.7% savings against the 2026 baseline while eliminating single-plant corrugator downtime risk.'
-  );
+  // null = use the draft generated from the figures on this page; a string = the buyer's own edit.
+  const [editedRationale, setExecutiveRationale] = useState<string | null>(null);
 
-  const effectiveVendors: Vendor[] = vendors.map((v) => ({
-    ...v,
-    processingStatus:
-      v.processingStatus === 'unextracted' ? 'extracted_NeedsReview' : v.processingStatus,
-  }));
+  const effectiveVendors: Vendor[] = vendors;
 
   const scenarioResult = evaluateScenario(
     scenarioConfig,
@@ -83,6 +79,14 @@ export const AwardRecommendationView: React.FC<AwardRecommendationViewProps> = (
 
   const awardedSuppliers = scenarioResult.vendorSummaries.filter((s) => s.itemsAwarded > 0);
   const openExceptions = exceptions.filter((e) => e.status !== 'Resolved (Buyer Verified)');
+  const failedVendors = vendors.filter((v) => !calculateVendorQualification(v.id, questions, responses).passedAllMandatory);
+  const vendorShort = (id: string) => vendors.find((v) => v.id === id)?.shortName ?? id;
+  const noPricesYet = scenarioResult.awardedLineItemsCount === 0;
+  // Draft built from the numbers on this page. It is not AI-written and not an approval.
+  const defaultRationale = noPricesYet
+    ? 'No line items can be awarded yet: extract the vendor documents and verify prices first. This memo is empty until there are comparable, quality-qualified prices.'
+    : `Draft for buyer review (assembled from the figures on this page; edit before use). Scenario "${scenarioConfig.name}" awards ${scenarioResult.awardedLineItemsCount} of ${lineItems.length} line items across ${awardedSuppliers.map((s) => s.vendorName).join(', ')}. Modelled cost ${formatInr(scenarioResult.totalProcurementCostInr)} against a baseline of ${formatInr(scenarioResult.totalBaselineCostInr)} (${scenarioResult.savingsPct}% difference). ${scenarioResult.unallocatedLineItemsCount} line item(s) have no usable price and are not allocated. ${openExceptions.length} extraction exception(s) remain open. ${failedVendors.length ? `Suppliers failing a mandatory question (based on sample questionnaire answers, not verified): ${failedVendors.map((v) => v.name).join(', ')}.` : 'No supplier fails a mandatory question in the sample answers.'}`;
+  const executiveRationale = editedRationale ?? defaultRationale;
 
   const strategyTitle =
     scenarioConfig.strategy === 'cheapest_eligible_split'
@@ -227,7 +231,7 @@ export const AwardRecommendationView: React.FC<AwardRecommendationViewProps> = (
               {awardedSuppliers.map((s) => s.vendorName.split(' ')[0]).join(', ')}
             </div>
             <div className="text-[11px] text-emerald-700 mt-1">
-              100% Mandatory QA Gate Compliant
+              {scenarioResult.qualityComplianceStatus} (sample questionnaire answers)
             </div>
           </div>
 
@@ -239,7 +243,7 @@ export const AwardRecommendationView: React.FC<AwardRecommendationViewProps> = (
               {openExceptions.length} Commercial Clarifications
             </div>
             <div className="text-[11px] text-slate-500 mt-1">
-              Southern Box Mfg. Excluded (QA Fail)
+              {failedVendors.length ? `${failedVendors.map((v) => v.shortName).join(', ')} excluded (mandatory question failed)` : 'No supplier excluded'}
             </div>
           </div>
         </div>
@@ -348,7 +352,8 @@ export const AwardRecommendationView: React.FC<AwardRecommendationViewProps> = (
                 <span>Quality & Technical Gate Evidence</span>
               </div>
               <p className="text-slate-600 text-[11px] leading-relaxed">
-                All selected suppliers hold active ISO 9001:2015 certification, in-house bursting/BCT test labs (&ge;18–24 kg/cm²), and historical lot defect rates &le;0.62%. Southern Box Mfg. (46.2/100) is excluded due to mandatory QA failure.
+                Mandatory-question outcomes come from the sample questionnaire answers shipped with this project; they are not read from the vendor files and are not buyer-verified. {awardedSuppliers.filter((x) => !failedVendors.some((f) => f.id === x.vendorId)).length} of {awardedSuppliers.length} awarded supplier(s) pass every mandatory question
+                {failedVendors.length ? `; excluded: ${failedVendors.map((v) => v.shortName).join(', ')}` : ''}.
               </p>
             </div>
 
@@ -358,7 +363,7 @@ export const AwardRecommendationView: React.FC<AwardRecommendationViewProps> = (
                 <span>Delivery & Supply Chain Resilience Evidence</span>
               </div>
               <p className="text-slate-600 text-[11px] leading-relaxed">
-                100% of awarded line items meet the &le;15-day Pashamylaram delivery SLA (avg {scenarioResult.avgDeliveryDays} days; EcoWrap located 9 km from plant; Apex 38 km from Medchal with 48-hr VMI buffer).
+                Average stated lead time of awarded lines: {scenarioResult.avgDeliveryDays} days (longest {scenarioResult.maxDeliveryDays}). Lead time is taken from each vendor document where it is stated; vendors that do not state one are treated as unknown.
               </p>
             </div>
 
@@ -370,15 +375,13 @@ export const AwardRecommendationView: React.FC<AwardRecommendationViewProps> = (
                 </span>
               </div>
               <ul className="space-y-1 text-[11px] text-amber-900 leading-relaxed">
-                <li>
-                  • <strong>Global Corrugators Footnote *:</strong> Confirm in PO addendum that the 4.5% volume rebate applies to the split-award value.
-                </li>
-                <li>
-                  • <strong>PrimePack Item 012 Conflict:</strong> Lock Ex-Works rate at ₹74.76/Box (Page 2 Para 4) rather than Schedule B (₹79.50).
-                </li>
-                <li>
-                  • <strong>EcoWrap Historical & Pallet Refs:</strong> Items 009, 010, 018, 019 withheld from EcoWrap unless written 2026 confirmation is logged.
-                </li>
+                {openExceptions.length === 0 && <li>• No open extraction exceptions.</li>}
+                {openExceptions.slice(0, 6).map((e) => (
+                  <li key={e.id}>
+                    • <strong>{vendorShort(e.vendorId)} {e.itemId}:</strong> {e.title}
+                  </li>
+                ))}
+                {openExceptions.length > 6 && <li>• …and {openExceptions.length - 6} more in Document Intelligence.</li>}
               </ul>
             </div>
           </div>

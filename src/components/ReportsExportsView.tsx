@@ -54,11 +54,7 @@ export const ReportsExportsView: React.FC<ReportsExportsViewProps> = ({
 }) => {
   const [selectedReport, setSelectedReport] = useState<ReportId>('vendor-comparison');
 
-  const effectiveVendors: Vendor[] = vendors.map((v) => ({
-    ...v,
-    processingStatus:
-      v.processingStatus === 'unextracted' ? 'extracted_NeedsReview' : v.processingStatus,
-  }));
+  const effectiveVendors: Vendor[] = vendors;
 
   const scenarioResult = evaluateScenario(
     scenarioConfig,
@@ -100,11 +96,7 @@ export const ReportsExportsView: React.FC<ReportsExportsViewProps> = ({
         'Qty',
         'UOM',
         'Baseline Rate (INR)',
-        'Apex Packaging (INR)',
-        'Global Corrugators (INR)',
-        'PrimePack Solutions (INR)',
-        'Southern Box Mfg [Disq] (INR)',
-        'EcoWrap Packaging (INR)',
+        ...vendors.map((v) => `${v.name} (INR)`),
         'Lowest Eligible Price (INR)',
         'Recommended Vendor',
       ];
@@ -113,9 +105,9 @@ export const ReportsExportsView: React.FC<ReportsExportsViewProps> = ({
         const recVendor = vendors.find((v) => v.id === alloc?.awardedVendorId);
         const getVal = (vId: string) => {
           const c = quoteCells.find((cell) => cell.itemId === item.id && cell.vendorId === vId);
-          if (!c || !c.quoted) return 'No Quote';
-          if (c.normalisedUnitPriceInr === null) return `Blocked (${c.provisionalUnitPriceInr ?? ''})`;
-          return c.normalisedUnitPriceInr.toFixed(2);
+          if (!c || !c.quoted) return 'No usable quote';
+          if (c.normalisedUnitPriceInr === null || !c.isComparable) return 'Blocked (needs buyer input)';
+          return `${c.normalisedUnitPriceInr.toFixed(2)}${c.buyerVerified ? ' [buyer verified]' : ' [unverified]'}`;
         };
         return [
           item.id,
@@ -125,11 +117,7 @@ export const ReportsExportsView: React.FC<ReportsExportsViewProps> = ({
           item.quantity,
           item.standardUom,
           item.baselineUnitPriceInr.toFixed(2),
-          getVal('V-APEX'),
-          getVal('V-GLOBAL'),
-          getVal('V-PRIMEPACK'),
-          getVal('V-SOUTHERN'),
-          getVal('V-ECOWRAP'),
+          ...vendors.map((v) => getVal(v.id)),
           alloc?.unitPriceInr ? alloc.unitPriceInr.toFixed(2) : 'N/A',
           recVendor?.shortName || 'Unallocated',
         ];
@@ -188,11 +176,7 @@ export const ReportsExportsView: React.FC<ReportsExportsViewProps> = ({
         'Criterion',
         'Gate Type',
         'Weight %',
-        'Apex Packaging',
-        'Global Corrugators',
-        'PrimePack Solutions',
-        'Southern Box Mfg.',
-        'EcoWrap Packaging',
+        ...vendors.map((v) => v.name),
       ];
       const rows = questions.map((q) => {
         const getScore = (vId: string) => {
@@ -206,16 +190,12 @@ export const ReportsExportsView: React.FC<ReportsExportsViewProps> = ({
           q.questionText,
           q.mandatoryCriterion ? 'MANDATORY HARD GATE' : 'Weighted Soft Score',
           q.weightPct,
-          getScore('V-APEX'),
-          getScore('V-GLOBAL'),
-          getScore('V-PRIMEPACK'),
-          getScore('V-SOUTHERN'),
-          getScore('V-ECOWRAP'),
+          ...vendors.map((v) => getScore(v.id)),
         ];
       });
       return {
         title: '3. Vendor Qualification & Mandatory QA Gate Evaluation Report',
-        subtitle: '12-point assessment across ISO 9001:2015, in-house Bursting/BCT labs, capacity, defect PPM, and ESG compliance.',
+        subtitle: '12-question assessment. Answers are sample inputs supplied with the project, not read from vendor files.',
         headers,
         rows,
         csvName: 'ProcureIQ_Vendor_Questionnaire_Report_2026.csv',

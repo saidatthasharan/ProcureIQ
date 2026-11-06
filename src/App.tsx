@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   LayoutDashboard,
   FileSpreadsheet,
@@ -43,13 +43,13 @@ import {
   PROJECT_METADATA,
   INITIAL_LINE_ITEMS,
   INITIAL_VENDORS,
-  INITIAL_QUOTE_CELLS,
-  INITIAL_EXCEPTIONS,
-  INITIAL_CONVERSION_RULES,
   QUESTIONNAIRE_QUESTIONS,
   INITIAL_QUESTIONNAIRE_RESPONSES,
 } from './data/seedData';
 import { calculateVendorQualification } from './services/procurementEngine';
+import { deriveVendorData } from './extraction/derive';
+import { pendingCells, pendingVendor } from './extraction/pending';
+import { extractDocument, fetchHealth, ApiError, type Health, type SourceView } from './services/extractionClient';
 import { SourceEvidenceDrawer } from './components/GovernanceUI';
 import { OverviewView } from './components/OverviewView';
 import { RfxWorkspaceView } from './components/RfxWorkspaceView';
@@ -86,16 +86,37 @@ export default function App() {
 
   // Core Application State
   const [lineItems, setLineItems] = useState<LineItem[]>(INITIAL_LINE_ITEMS);
-  const [vendors, setVendors] = useState<Vendor[]>(INITIAL_VENDORS);
-  const [quoteCells, setQuoteCells] = useState<VendorQuoteCell[]>(INITIAL_QUOTE_CELLS);
-  const [exceptions, setExceptions] = useState<ExtractionException[]>(INITIAL_EXCEPTIONS);
-  const [conversionRules, setConversionRules] =
-    useState<ConversionRule[]>(INITIAL_CONVERSION_RULES);
+  // Nothing is pre-extracted. Only the list of invited suppliers is known at the start;
+  // every price, term and exception below comes from a real extraction run.
+  const [vendors, setVendors] = useState<Vendor[]>(() => INITIAL_VENDORS.map(pendingVendor));
+  const [quoteCells, setQuoteCells] = useState<VendorQuoteCell[]>(() =>
+    pendingCells(INITIAL_VENDORS, INITIAL_LINE_ITEMS)
+  );
+  const [exceptions, setExceptions] = useState<ExtractionException[]>([]);
+  const [conversionRules, setConversionRules] = useState<ConversionRule[]>([]);
   const [questions, setQuestions] =
     useState<QuestionnaireQuestion[]>(QUESTIONNAIRE_QUESTIONS);
-  const [responses] = useState<VendorQuestionnaireResponse[]>(
-    INITIAL_QUESTIONNAIRE_RESPONSES
+  // The questionnaire answers are SAMPLE INPUTS shipped with the project (not read from the
+  // vendor files). They start unverified; the UI and reports say so.
+  const [responses] = useState<VendorQuestionnaireResponse[]>(() =>
+    INITIAL_QUESTIONNAIRE_RESPONSES.map((r) => ({ ...r, origin: 'sample_input' as const, buyerVerified: false }))
   );
+
+  // Uploaded files and what the server parsed from them (kept for the side-by-side viewer).
+  const vendorFiles = useRef<Record<string, File>>({});
+  const [sourceViews, setSourceViews] = useState<Record<string, SourceView>>({});
+  const [sourceImageUrls, setSourceImageUrls] = useState<Record<string, string>>({});
+  const [health, setHealth] = useState<Health | null>(null);
+  const pickerRef = useRef<HTMLInputElement>(null);
+  const pickerVendor = useRef<string | null>(null);
+  // In-memory audit trail of buyer and system actions in this session (not persisted; see docs).
+  const [auditLog, setAuditLog] = useState<{ at: string; actor: 'buyer' | 'system'; action: string; detail: string }[]>([]);
+  const audit = (actor: 'buyer' | 'system', action: string, detail: string) =>
+    setAuditLog((prev) => [...prev, { at: new Date().toISOString(), actor, action, detail }]);
+
+  React.useEffect(() => {
+    fetchHealth().then(setHealth);
+  }, []);
 
   // Scenario & Award state
   const [scenarioConfig, setScenarioConfig] = useState<ScenarioConfig>({
@@ -158,87 +179,136 @@ export default function App() {
     }
   };
 
-  // Extract single vendor document
+  const vendorQualifies = (vendorId: string) =>
+    calculateVendorQualification(vendorId, questions, responses).passedAllMandatory;
+
+  // Run the real pipeline for one vendor file: server parses + Gemini reads + server verifies evidence,
+  // then the deterministic normaliser builds cells. Nothing is filled in if any step fails.
+  const runExtraction = async (vendorId: string, file: File): Promise<boolean> => {
+    const vendor = vendors.find((v) => v.id === vendorId);
+    if (!vendor) return false;
+    setVendors((prev) => prev.map((v) => (v.id === vendorId ? { ...v, processingStatus: 'processing' } : v)));
+    try {
+      const resp = await extractDocument(file, lineItems);
+      const derived = deriveVendorData(vendor, resp.result, lineItems, {
+        settings: { usdToInrRate: scenarioConfig.usdToInrRate, defaultGstRatePct: 18 },
+        minConfidence: 0.85,
+      });
+      vendorFiles.current[vendorId] = file;
+      setSourceViews((prev) => ({ ...prev, [vendorId]: resp.sourceView }));
+      setSourceImageUrls((prev) => {
+        if (prev[vendorId]) URL.revokeObjectURL(prev[vendorId]);
+        const next = { ...prev };
+        if (resp.sourceView.format === 'image') next[vendorId] = URL.createObjectURL(file);
+        else delete next[vendorId];
+        return next;
+      });
+      setQuoteCells((prev) => [...prev.filter((c) => c.vendorId !== vendorId), ...derived.cells]);
+      setExceptions((prev) => [...prev.filter((e) => e.vendorId !== vendorId), ...derived.exceptions]);
+      setConversionRules((prev) => [...prev.filter((r) => r.vendorId !== vendorId), ...derived.rules]);
+      setVendors((prev) =>
+        prev.map((v) =>
+          v.id === vendorId
+            ? {
+                ...v,
+                ...derived.vendorPatch,
+                documentFileName: file.name,
+                documentSize: `${(file.size / 1024).toFixed(0)} KB`,
+                submissionTimestamp: new Date().toLocaleString(),
+                clarificationRequested: false,
+                clarificationNote: undefined,
+              }
+            : v
+        )
+      );
+      audit('system', 'extraction', `${vendor.name}: ${file.name} read by ${resp.result.meta.model}; ${derived.exceptions.length} exceptions; sha256 ${resp.result.meta.sha256.slice(0, 12)}`);
+      return true;
+    } catch (e) {
+      setVendors((prev) => prev.map((v) => (v.id === vendorId ? { ...v, processingStatus: vendor.processingStatus === 'processing' ? 'unextracted' : vendor.processingStatus } : v)));
+      const msg = e instanceof ApiError ? e.message : 'Extraction failed unexpectedly.';
+      audit('system', 'extraction_failed', `${vendor.name}: ${msg}`);
+      showToast(`${vendor.shortName}: ${msg} No data was saved.`, 'warning');
+      return false;
+    }
+  };
+
+  const loadSampleFiles = async (): Promise<Record<string, File>> => {
+    const out: Record<string, File> = {};
+    try {
+      const manifest = (await (await fetch('/sample-vendor-files/manifest.json')).json()) as Record<string, string>;
+      for (const [vid, name] of Object.entries(manifest)) {
+        const r = await fetch('/sample-vendor-files/' + encodeURIComponent(name));
+        if (r.ok) out[vid] = new File([await r.blob()], name);
+      }
+    } catch {
+      /* handled by caller */
+    }
+    return out;
+  };
+
+  // Extract a single vendor. If no file is attached yet, ask the user to choose one.
   const handleExtractVendor = (vendorId: string) => {
-    setVendors((prev) =>
-      prev.map((v) =>
-        v.id === vendorId ? { ...v, processingStatus: 'processing' } : v
-      )
-    );
-
-    setTimeout(() => {
-      setVendors((prev) =>
-        prev.map((v) => {
-          if (v.id !== vendorId) return v;
-          const nextValidation: Vendor['validationStatus'] =
-            v.id === 'V-SOUTHERN'
-              ? 'Disqualified on Quality'
-              : v.id === 'V-ECOWRAP' || v.id === 'V-PRIMEPACK' || v.id === 'V-GLOBAL'
-              ? 'Exceptions Found'
-              : 'Verified';
-          return {
-            ...v,
-            processingStatus: 'extracted_NeedsReview',
-            validationStatus: nextValidation,
-          };
-        })
-      );
-      const targetVendor = vendors.find((v) => v.id === vendorId);
-      showToast(
-        `Extracted ${targetVendor?.itemsQuotedCount || 30} items from ${targetVendor?.documentFileName} (${targetVendor?.extractionConfidencePct}% confidence).`,
-        'success'
-      );
-    }, 350);
+    const file = vendorFiles.current[vendorId];
+    if (file) {
+      void runExtraction(vendorId, file).then((ok) => ok && showToast('Extraction finished. Review the exceptions before relying on any price.', 'success'));
+      return;
+    }
+    pickerVendor.current = vendorId;
+    pickerRef.current?.click();
   };
 
-  // Extract all 5 vendor documents
-  const handleExtractAllVendors = () => {
+  // Extract all vendors. Vendors without an uploaded file use the bundled sample files (clearly stated).
+  const handleExtractAllVendors = async () => {
     setIsExtractingAll(true);
-    setVendors((prev) =>
-      prev.map((v) =>
-        v.processingStatus === 'unextracted'
-          ? { ...v, processingStatus: 'processing' }
-          : v
-      )
-    );
-
-    setTimeout(() => {
-      setVendors((prev) =>
-        prev.map((v) => ({
-          ...v,
-          processingStatus:
-            v.processingStatus === 'verified' ? 'verified' : 'extracted_NeedsReview',
-          validationStatus:
-            v.id === 'V-SOUTHERN'
-              ? 'Disqualified on Quality'
-              : v.id === 'V-ECOWRAP' || v.id === 'V-PRIMEPACK' || v.id === 'V-GLOBAL'
-              ? 'Exceptions Found'
-              : 'Verified',
-        }))
-      );
+    const missing = vendors.filter((v) => !vendorFiles.current[v.id]);
+    let usedSamples = false;
+    if (missing.length) {
+      const samples = await loadSampleFiles();
+      for (const v of missing) if (samples[v.id]) { vendorFiles.current[v.id] = samples[v.id]; usedSamples = true; }
+    }
+    const targets = vendors.filter((v) => vendorFiles.current[v.id]);
+    if (!targets.length) {
       setIsExtractingAll(false);
-      showToast(
-        'Processed all 5 vendor submissions (.xlsx, .pdf, .docx, .jpg, .eml). 139 quoted cells extracted; 8 exceptions queued.',
-        'success'
-      );
-    }, 450);
+      showToast('No vendor files are available. Upload a file for a supplier first.', 'warning');
+      return;
+    }
+    let ok = 0;
+    // Two at a time keeps load on the AI service modest.
+    for (let i = 0; i < targets.length; i += 2) {
+      const results = await Promise.all(targets.slice(i, i + 2).map((v) => runExtraction(v.id, vendorFiles.current[v.id])));
+      ok += results.filter(Boolean).length;
+    }
+    setIsExtractingAll(false);
+    showToast(
+      `${ok} of ${targets.length} vendor documents processed${usedSamples ? ' (bundled sample files were used for suppliers with no upload)' : ''}. Nothing is buyer-verified yet.`,
+      ok === targets.length ? 'success' : 'warning'
+    );
   };
 
-  // Approve extracted vendor submission
+  const handlePickedFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const vid = pickerVendor.current;
+    e.target.value = '';
+    if (file && vid) void handleUploadRevision(vid, file);
+  };
+
+  // Approve extracted vendor submission (a human action). Blocked while real exceptions are open.
   const handleApproveVendorExtraction = (vendorId: string) => {
+    const v = vendors.find((vend) => vend.id === vendorId);
+    const open = exceptions.filter((e) => e.vendorId === vendorId && e.severity !== 'Info' && e.status !== 'Resolved (Buyer Verified)');
+    if (open.length) {
+      showToast(`${open.length} open exception(s) for ${v?.shortName}. Resolve or verify them first.`, 'warning');
+      return;
+    }
+    const qualifies = vendorQualifies(vendorId);
     setVendors((prev) =>
-      prev.map((v) =>
-        v.id === vendorId
-          ? {
-              ...v,
-              processingStatus: 'verified',
-              validationStatus:
-                v.id === 'V-SOUTHERN' ? 'Disqualified on Quality' : 'Verified',
-            }
-          : v
+      prev.map((x) =>
+        x.id === vendorId
+          ? { ...x, processingStatus: 'verified', validationStatus: qualifies ? 'Verified' : 'Disqualified on Quality' }
+          : x
       )
     );
-    const v = vendors.find((vend) => vend.id === vendorId);
+    audit('buyer', 'approve_extraction', `${v?.name} extraction accepted by buyer`);
     showToast(`Marked ${v?.name} extraction as Buyer Verified.`, 'success');
   };
 
@@ -252,283 +322,124 @@ export default function App() {
       )
     );
     const v = vendors.find((vend) => vend.id === vendorId);
+    audit('buyer', 'reject_submission', v?.name ?? vendorId);
     showToast(`Rejected submission from ${v?.name}.`, 'warning');
   };
 
-  // Request vendor clarification
+  // Record a clarification request (the email itself is not sent; no mail integration).
   const handleRequestVendorClarification = (vendorId: string, note: string) => {
     setVendors((prev) =>
       prev.map((v) =>
         v.id === vendorId
-          ? {
-              ...v,
-              clarificationRequested: true,
-              clarificationNote: note,
-              validationStatus: 'Clarification Requested',
-            }
+          ? { ...v, clarificationRequested: true, clarificationNote: note, validationStatus: 'Clarification Requested' }
           : v
       )
     );
     const v = vendors.find((vend) => vend.id === vendorId);
-    showToast(`Clarification request dispatched to ${v?.name}.`, 'info');
+    audit('buyer', 'clarification_requested', `${v?.name}: ${note}`);
+    showToast(`Clarification request recorded for ${v?.name}. (No email is sent from this prototype.)`, 'info');
   };
 
-  // Upload revision document
-  const handleUploadRevision = (vendorId: string, fileName: string) => {
-    setVendors((prev) =>
-      prev.map((v) =>
-        v.id === vendorId
-          ? {
-              ...v,
-              documentFileName: fileName,
-              submissionTimestamp: 'Just now (Revision)',
-              processingStatus: 'extracted_NeedsReview',
-            }
-          : v
-      )
-    );
-    showToast(`Uploaded ${fileName} and extracted updated fields.`, 'success');
+  // Upload a (revised) vendor document and run the real extraction on it.
+  const handleUploadRevision = async (vendorId: string, file: File) => {
+    const ok = await runExtraction(vendorId, file);
+    if (ok) showToast(`Read ${file.name}. Review the exceptions before relying on any price.`, 'success');
   };
 
-  // Verify individual quote cell & unblock comparison
-  const handleVerifyCell = (
-    itemId: string,
-    vendorId: string,
-    newPriceInr?: number
-  ) => {
-    setVendors((prev) =>
-      prev.map((v) =>
-        v.id === vendorId && v.processingStatus === 'unextracted'
-          ? { ...v, processingStatus: 'extracted_NeedsReview' }
-          : v
-      )
-    );
-
+  // Buyer verifies one cell. A price must exist (extracted, provisional or typed in);
+  // verifying never invents a price.
+  const handleVerifyCell = (itemId: string, vendorId: string, newPriceInr?: number): boolean => {
+    const cell = quoteCells.find((c) => c.itemId === itemId && c.vendorId === vendorId);
+    if (!cell) return false;
+    const resolved = newPriceInr ?? cell.normalisedUnitPriceInr ?? cell.provisionalUnitPriceInr ?? null;
+    if (resolved === null || !Number.isFinite(resolved) || resolved <= 0) {
+      showToast('There is no price on record for this cell. Enter the price you read in the source document, in INR per RFx unit, to verify it.', 'warning');
+      return false;
+    }
+    const overridden = newPriceInr !== undefined && newPriceInr !== cell.normalisedUnitPriceInr;
     setQuoteCells((prev) =>
-      prev.map((cell) => {
-        if (cell.itemId !== itemId || cell.vendorId !== vendorId) return cell;
-        const resolvedPrice =
-          newPriceInr ??
-          cell.normalisedUnitPriceInr ??
-          cell.provisionalUnitPriceInr ??
-          0;
-        return {
-          ...cell,
-          normalisedUnitPriceInr: resolvedPrice,
-          buyerVerified: true,
-          isComparable: true,
-          validationStatus: 'buyer_verified',
-        };
-      })
-    );
-
-    setExceptions((prev) =>
-      prev.map((exc) =>
-        exc.itemId === itemId && exc.vendorId === vendorId
-          ? { ...exc, status: 'Resolved (Buyer Verified)' }
-          : exc
-      )
-    );
-
-    showToast(
-      `Buyer verified ${itemId} for ${vendorId} (${
-        newPriceInr ? '₹' + newPriceInr.toFixed(2) : 'Approved'
-      }). Cell is now comparable.`,
-      'success'
-    );
-    setEvidenceTarget(null);
-  };
-
-  // Resolve exception from Exception Queue with full multi-item & rule synchronization
-  const handleResolveException = (
-    exceptionId: string,
-    resolutionValueInr?: number
-  ) => {
-    const targetExc = exceptions.find((e) => e.id === exceptionId);
-    if (!targetExc) return;
-
-    setExceptions((prev) =>
-      prev.map((e) =>
-        e.id === exceptionId ? { ...e, status: 'Resolved (Buyer Verified)' } : e
-      )
-    );
-
-    if (exceptionId === 'EXC-002') {
-      // Unblock all 3 EcoWrap historical rate items (PKG-HYD-009, PKG-HYD-010, PKG-HYD-018) and verify CONV-008
-      const historicalItems = ['PKG-HYD-009', 'PKG-HYD-010', 'PKG-HYD-018'];
-      setQuoteCells((prev) =>
-        prev.map((cell) => {
-          if (cell.vendorId === 'V-ECOWRAP' && historicalItems.includes(cell.itemId)) {
-            return {
-              ...cell,
-              normalisedUnitPriceInr:
-                cell.normalisedUnitPriceInr ?? cell.provisionalUnitPriceInr ?? 0,
+      prev.map((c) =>
+        c.itemId === itemId && c.vendorId === vendorId
+          ? {
+              ...c,
+              quoted: true,
+              normalisedUnitPriceInr: resolved,
+              originalExtractedPriceInr: overridden ? (c.normalisedUnitPriceInr ?? c.provisionalUnitPriceInr) : c.originalExtractedPriceInr,
+              buyerConfirmedPriceInr: overridden ? resolved : c.buyerConfirmedPriceInr,
               buyerVerified: true,
+              trust: 'buyer_verified',
               isComparable: true,
+              blockReasons: [],
               validationStatus: 'buyer_verified',
-            };
-          }
-          return cell;
-        })
-      );
-      setConversionRules((prev) =>
-        prev.map((r) =>
-          r.id === 'CONV-008'
-            ? {
-                ...r,
-                verificationStatus: 'Buyer Verified',
-                blocksComparisonUntilVerified: false,
-              }
-            : r
-        )
-      );
-      showToast(
-        'Verified EcoWrap Q3 2025 PO rates for PKG-HYD-009, PKG-HYD-010, and PKG-HYD-018.',
-        'success'
-      );
-      return;
-    }
-
-    if (exceptionId === 'EXC-001') {
-      setConversionRules((prev) =>
-        prev.map((r) =>
-          r.id === 'CONV-007'
-            ? {
-                ...r,
-                verificationStatus: 'Buyer Verified',
-                blocksComparisonUntilVerified: false,
-              }
-            : r
-        )
-      );
-    }
-
-    if (exceptionId === 'EXC-005') {
-      setConversionRules((prev) =>
-        prev.map((r) =>
-          r.id === 'CONV-004'
-            ? {
-                ...r,
-                verificationStatus: 'Buyer Verified',
-                blocksComparisonUntilVerified: false,
-              }
-            : r
-        )
-      );
-    }
-
-    if (exceptionId === 'EXC-004') {
-      const lowOcrItems = ['PKG-HYD-004', 'PKG-HYD-015', 'PKG-HYD-023'];
-      setQuoteCells((prev) =>
-        prev.map((cell) => {
-          if (cell.vendorId === 'V-SOUTHERN' && lowOcrItems.includes(cell.itemId)) {
-            return {
-              ...cell,
-              buyerVerified: true,
-              validationStatus: 'buyer_verified',
-            };
-          }
-          return cell;
-        })
-      );
-      showToast(
-        'Buyer verified Southern Box Mfg. low-OCR handwritten items (PKG-HYD-004, 015, 023).',
-        'success'
-      );
-      return;
-    }
-
-    if (resolutionValueInr !== undefined) {
-      handleVerifyCell(targetExc.itemId, targetExc.vendorId, resolutionValueInr);
-    } else {
-      showToast(`Exception ${exceptionId} marked as resolved.`, 'success');
-    }
+            }
+          : c
+      )
+    );
+    setExceptions((prev) =>
+      prev.map((e) => (e.itemId === itemId && e.vendorId === vendorId ? { ...e, status: 'Resolved (Buyer Verified)', resolvedValueInr: resolved } : e))
+    );
+    audit('buyer', overridden ? 'verify_cell_with_override' : 'verify_cell', `${vendorId} ${itemId}: INR ${resolved.toFixed(2)}${overridden ? ` (extracted value was ${cell.normalisedUnitPriceInr ?? cell.provisionalUnitPriceInr ?? 'none'})` : ''}`);
+    showToast(`Buyer verified ${itemId} for ${vendorId} (₹${resolved.toFixed(2)}). Cell is now comparable.`, 'success');
+    setEvidenceTarget(null);
+    return true;
   };
 
-  // Verify conversion rule in Standardisation Engine & sync linked Exceptions
+  // Resolve an exception from the queue. Works for any exception; needs a price when the cell has none.
+  const handleResolveException = (exceptionId: string, resolutionValueInr?: number) => {
+    const exc = exceptions.find((e) => e.id === exceptionId);
+    if (!exc) return;
+    const cell = quoteCells.find((c) => c.itemId === exc.itemId && c.vendorId === exc.vendorId);
+    if (cell && (cell.quoted || resolutionValueInr !== undefined)) {
+      handleVerifyCell(exc.itemId, exc.vendorId, resolutionValueInr);
+      return;
+    }
+    setExceptions((prev) => prev.map((e) => (e.id === exceptionId ? { ...e, status: 'Resolved (Buyer Verified)' } : e)));
+    audit('buyer', 'acknowledge_exception', `${exceptionId}: ${exc.title}`);
+    showToast(`Exception ${exceptionId} acknowledged. No price was added for this item.`, 'info');
+  };
+
+  // Buyer accepts a conversion rule. This confirms the ASSUMPTION; cells that were only blocked by
+  // freight/tax assumptions become comparable; cells blocked by unknown units, currencies or
+  // historical references stay blocked until a price is entered.
   const handleVerifyConversionRule = (ruleId: string) => {
     const rule = conversionRules.find((r) => r.id === ruleId);
-    setConversionRules((prev) =>
-      prev.map((r) =>
-        r.id === ruleId
-          ? {
-              ...r,
-              verificationStatus: 'Buyer Verified',
-              blocksComparisonUntilVerified: false,
-            }
-          : r
-      )
+    if (!rule) return;
+    const softBlocks = new Set(['freight_not_quantified', 'tax_rate_missing']);
+    let released = 0;
+    setConversionRules((prev) => prev.map((r) => (r.id === ruleId ? { ...r, verificationStatus: 'Buyer Verified', blocksComparisonUntilVerified: false } : r)));
+    setQuoteCells((prev) =>
+      prev.map((c) => {
+        if (c.vendorId !== rule.vendorId || !rule.affectedItemIds.includes(c.itemId)) return c;
+        const reasons = c.blockReasons ?? [];
+        const onlySoft = reasons.length > 0 && reasons.every((r) => softBlocks.has(r)) && c.provisionalUnitPriceInr !== null;
+        if (onlySoft) {
+          released++;
+          return {
+            ...c,
+            normalisedUnitPriceInr: c.provisionalUnitPriceInr,
+            isComparable: true,
+            blockReasons: [],
+            assumptions: [...(c.assumptions ?? []), `Conversion rule ${ruleId} accepted by buyer.`],
+          };
+        }
+        return c;
+      })
     );
-
-    if (rule) {
-      setQuoteCells((prev) =>
-        prev.map((c) => {
-          if (
-            c.vendorId === rule.vendorId &&
-            rule.affectedItemIds.includes(c.itemId) &&
-            c.quoted
-          ) {
-            return {
-              ...c,
-              normalisedUnitPriceInr:
-                c.normalisedUnitPriceInr ?? c.provisionalUnitPriceInr,
-              isComparable: true,
-              buyerVerified: true,
-              validationStatus: 'buyer_verified',
-            };
-          }
-          return c;
-        })
-      );
-
-      // Sync corresponding exceptions if applicable
-      const linkedExcId =
-        ruleId === 'CONV-007'
-          ? 'EXC-001'
-          : ruleId === 'CONV-008'
-          ? 'EXC-002'
-          : ruleId === 'CONV-004'
-          ? 'EXC-005'
-          : null;
-      if (linkedExcId) {
-        setExceptions((prev) =>
-          prev.map((e) =>
-            e.id === linkedExcId ? { ...e, status: 'Resolved (Buyer Verified)' } : e
-          )
-        );
-      }
-
-      showToast(
-        `Verified Standardisation Rule ${ruleId}. Affected items (${rule.affectedItemIds.length}) unblocked in Bid Matrix.`,
-        'success'
-      );
-    }
+    audit('buyer', 'verify_rule', `${ruleId} (${rule.category}) for ${rule.vendorId}; ${released} cell(s) released`);
+    showToast(
+      released
+        ? `Verified rule ${ruleId}. ${released} item(s) are now comparable.`
+        : `Verified rule ${ruleId}. Items blocked by unknown units, currencies or past-price references still need a price to be entered.`,
+      'success'
+    );
   };
 
-  // Export matrix to CSV helper
+  // Export the comparison matrix: one column per supplier actually in the project.
   const handleExportMatrixCsv = () => {
-    const headers = [
-      'Item ID',
-      'SKU Code',
-      'Description',
-      'Category',
-      'Quantity',
-      'UOM',
-      'Baseline INR',
-      'Apex Packaging INR',
-      'Global Corrugators INR',
-      'PrimePack Solutions INR',
-      'Southern Box Mfg (Disq) INR',
-      'EcoWrap Packaging INR',
-    ];
+    const cols = vendors.map((v) => v.name);
+    const headers = ['Item ID', 'SKU Code', 'Description', 'Category', 'Quantity', 'UOM', 'Baseline INR', ...cols.map((n) => `${n} INR`), ...cols.map((n) => `${n} status`)];
     const rows = lineItems.map((item) => {
-      const getVal = (vId: string) => {
-        const c = quoteCells.find(
-          (cell) => cell.itemId === item.id && cell.vendorId === vId
-        );
-        if (!c || !c.quoted) return 'No Quote';
-        return (c.normalisedUnitPriceInr ?? c.provisionalUnitPriceInr ?? '').toString();
-      };
+      const cells = vendors.map((v) => quoteCells.find((c) => c.itemId === item.id && c.vendorId === v.id));
       return [
         item.id,
         item.code,
@@ -537,14 +448,11 @@ export default function App() {
         item.quantity,
         item.standardUom,
         item.baselineUnitPriceInr,
-        getVal('V-APEX'),
-        getVal('V-GLOBAL'),
-        getVal('V-PRIMEPACK'),
-        getVal('V-SOUTHERN'),
-        getVal('V-ECOWRAP'),
+        ...cells.map((c) => (c && c.isComparable && c.normalisedUnitPriceInr !== null ? c.normalisedUnitPriceInr.toString() : c?.quoted ? 'Blocked' : 'No usable quote')),
+        ...cells.map((c) => (c ? `${c.trust ?? 'none'}${c.buyerVerified ? ' (buyer verified)' : ''}` : '')),
       ].join(',');
     });
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const csvContent = '﻿' + [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -554,7 +462,7 @@ export default function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Exported 30×5 Bid Comparison Matrix to Excel-compatible CSV.', 'success');
+    showToast(`Exported ${lineItems.length}×${vendors.length} comparison matrix to CSV.`, 'success');
   };
 
   // Global search matching
@@ -1017,6 +925,7 @@ export default function App() {
               onNavigate={handleNavigate}
               onExtractAllVendors={handleExtractAllVendors}
               isExtractingAll={isExtractingAll}
+              auditLog={auditLog}
             />
           )}
 
@@ -1045,6 +954,7 @@ export default function App() {
                   )
                 )
               }
+              onAddQuestion={(q) => setQuestions((prev) => [...prev, q])}
               onNotify={showToast}
             />
           )}
@@ -1080,6 +990,8 @@ export default function App() {
               onOpenCellEvidence={(itemId, vendorId) =>
                 setEvidenceTarget({ itemId, vendorId })
               }
+              sourceViews={sourceViews}
+              sourceImageUrls={sourceImageUrls}
             />
           )}
 
@@ -1117,6 +1029,8 @@ export default function App() {
               questions={questions}
               responses={responses}
               exceptions={exceptions}
+              usdToInrRate={scenarioConfig.usdToInrRate}
+              health={health}
             />
           )}
 
@@ -1184,18 +1098,20 @@ export default function App() {
               scenarioConfig={scenarioConfig}
               onChangeScenarioConfig={setScenarioConfig}
               onResetToUnextractedDemoState={() => {
-                setVendors(INITIAL_VENDORS);
-                setQuoteCells(INITIAL_QUOTE_CELLS);
-                setExceptions(INITIAL_EXCEPTIONS);
-                setConversionRules(INITIAL_CONVERSION_RULES);
+                setVendors(INITIAL_VENDORS.map(pendingVendor));
+                setQuoteCells(pendingCells(INITIAL_VENDORS, INITIAL_LINE_ITEMS));
+                setExceptions([]);
+                setConversionRules([]);
+                setSourceViews({});
+                setSourceImageUrls({});
+                vendorFiles.current = {};
                 setAwardApprovedByBuyer(false);
-                showToast(
-                  'Reset all 5 vendor submissions to initial Unextracted demo state.',
-                  'info'
-                );
+                audit('buyer', 'reset', 'All extracted data cleared');
+                showToast('Cleared all extracted data. Suppliers are back to Pending Extraction.', 'info');
               }}
               onFastForwardExtractedDemoState={handleExtractAllVendors}
               onNotify={showToast}
+              health={health}
             />
           )}
         </main>
@@ -1209,12 +1125,23 @@ export default function App() {
         vendor={drawerVendor}
         cell={drawerCell}
         conversionRule={drawerRule}
+        usdToInrRate={scenarioConfig.usdToInrRate}
+        sourceImageUrl={evidenceTarget ? sourceImageUrls[evidenceTarget.vendorId] : undefined}
         isVendorQualityQualified={drawerVendorQual}
         onVerifyCell={handleVerifyCell}
         onRequestClarification={(vendorId, itemId, note) => {
           handleRequestVendorClarification(vendorId, `[${itemId}] ${note}`);
           setEvidenceTarget(null);
         }}
+      />
+
+      {/* Hidden file picker used by the Extract buttons when no file is attached yet */}
+      <input
+        ref={pickerRef}
+        type="file"
+        accept=".xlsx,.pdf,.docx,.jpg,.jpeg,.png,.eml"
+        className="hidden"
+        onChange={handlePickedFile}
       />
 
       {/* Help & Product Walkthrough Modal */}

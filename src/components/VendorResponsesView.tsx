@@ -29,7 +29,7 @@ interface VendorResponsesViewProps {
   onApproveVendorExtraction: (vendorId: string) => void;
   onRejectVendor: (vendorId: string) => void;
   onRequestVendorClarification: (vendorId: string, note: string) => void;
-  onUploadRevision: (vendorId: string, fileName: string) => void;
+  onUploadRevision: (vendorId: string, file: File) => void;
   onNavigate: (workspace: WorkspaceId, vendorIdHint?: string) => void;
 }
 
@@ -49,7 +49,7 @@ export const VendorResponsesView: React.FC<VendorResponsesViewProps> = ({
   const [clarifyingVendor, setClarifyingVendor] = useState<Vendor | null>(null);
   const [clarificationText, setClarificationText] = useState('');
   const [uploadingVendor, setUploadingVendor] = useState<Vendor | null>(null);
-  const [uploadFileName, setUploadFileName] = useState('');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   const unextractedCount = vendors.filter((v) => v.processingStatus === 'unextracted').length;
 
@@ -80,7 +80,7 @@ export const VendorResponsesView: React.FC<VendorResponsesViewProps> = ({
           <button
             onClick={() => {
               setUploadingVendor(vendors[0]);
-              setUploadFileName('Supplier_Addendum_HYD2026.pdf');
+              setUploadFile(null);
             }}
             className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-md inline-flex items-center gap-1.5 cursor-pointer"
           >
@@ -332,7 +332,7 @@ export const VendorResponsesView: React.FC<VendorResponsesViewProps> = ({
                   {sidePreviewVendor.questionnaireStatus}
                 </div>
                 <div className="text-[11px] text-slate-500">
-                  Lead time: {sidePreviewVendor.deliveryLeadTimeDays} Days
+                  Lead time: {sidePreviewVendor.leadTimeStated === false ? 'not stated' : `${sidePreviewVendor.deliveryLeadTimeDays} days`}
                 </div>
               </div>
             </div>
@@ -444,13 +444,16 @@ export const VendorResponsesView: React.FC<VendorResponsesViewProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-slate-500 mb-1">Document Filename</label>
+                <label className="block text-slate-500 mb-1">Vendor document (.xlsx, .pdf, .docx, .jpg/.png, .eml)</label>
                 <input
-                  type="text"
-                  value={uploadFileName}
-                  onChange={(e) => setUploadFileName(e.target.value)}
-                  className="w-full px-3 py-1.5 font-mono border border-slate-300 rounded-md"
+                  type="file"
+                  accept=".xlsx,.pdf,.docx,.jpg,.jpeg,.png,.eml"
+                  onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+                  className="w-full text-xs"
                 />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  The file is sent to the ProcureIQ server and read by the AI. Nothing is pre-filled.
+                </p>
               </div>
             </div>
             <div className="flex justify-end gap-2">
@@ -461,8 +464,10 @@ export const VendorResponsesView: React.FC<VendorResponsesViewProps> = ({
                 Cancel
               </button>
               <button
+                disabled={!uploadFile}
                 onClick={() => {
-                  onUploadRevision(uploadingVendor.id, uploadFileName);
+                  if (!uploadFile) return;
+                  onUploadRevision(uploadingVendor.id, uploadFile);
                   setUploadingVendor(null);
                 }}
                 className="px-4 py-1.5 text-xs font-medium text-white bg-[#6161F5] hover:bg-[#4F4FE0] rounded-md cursor-pointer"

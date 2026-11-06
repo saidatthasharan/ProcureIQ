@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { ScenarioConfig } from '../types/procurement';
 import { TrustBadge } from './GovernanceUI';
+import type { Health } from '../services/extractionClient';
 
 interface SettingsViewProps {
   scenarioConfig: ScenarioConfig;
@@ -14,6 +15,7 @@ interface SettingsViewProps {
   onResetToUnextractedDemoState: () => void;
   onFastForwardExtractedDemoState: () => void;
   onNotify: (msg: string, type?: 'success' | 'info' | 'warning') => void;
+  health?: Health | null;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -22,6 +24,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onResetToUnextractedDemoState,
   onFastForwardExtractedDemoState,
   onNotify,
+  health,
 }) => {
   const [ocrThreshold, setOcrThreshold] = useState(85);
   const [gstBaselinePct, setGstBaselinePct] = useState(18);
@@ -52,7 +55,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             className="px-3.5 py-1.5 text-xs font-medium text-white bg-[#6161F5] hover:bg-[#4F4FE0] rounded-md inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
           >
             <Play className="w-3 h-3 fill-white" />
-            <span>Fast-Forward: Extract All 5 Vendors</span>
+            <span>Extract All (uses sample files if none uploaded)</span>
           </button>
         </div>
       </div>
@@ -86,7 +89,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="w-full accent-[#6161F5]"
               />
               <p className="text-[11px] text-slate-500 mt-1">
-                Fields extracted below {ocrThreshold}% (such as Southern Box Mfg.&apos;s angled photo items 004, 015, 023 at 61.5%) are routed to the Exception Queue for manual verification.
+                Display only in this prototype: the extraction pipeline currently uses a fixed 85% confidence threshold. Lines the AI reads below it, and any price it cannot find in the source text, go to the Exception Queue.
               </p>
             </div>
 
@@ -133,7 +136,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   Block Unconfirmed Previous-Year Pricing References
                 </div>
                 <div className="text-[11px] text-slate-500">
-                  Prevents &ldquo;Same as 2025 contract&rdquo; statements (e.g., EcoWrap Items 009, 010, 018) from entering eligible bid comparisons until verified.
+                  Always on. A &ldquo;same as our previous order&rdquo; statement is never turned into a price; it stays blocked until a buyer enters a confirmed price. (This switch is display only.)
                 </div>
               </div>
             </label>
@@ -173,41 +176,47 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <span className="font-mono text-[11px] text-emerald-700">ACTIVE (LIVE)</span>
               </div>
               <p className="text-[11px] text-emerald-900">
-                Full 30×5 commercial matrix, UOM/currency conversion math, mandatory quality gate enforcement, and CSV/JSON report generation run live in the browser.
+                Unit and currency conversion maths, discount and tax handling, mandatory-question gating, scenario costing and CSV export run as ordinary code in the browser. No AI is involved in any price calculation.
               </p>
             </div>
 
             <div className="p-3 bg-[#FAFAFC] border border-slate-200/90 rounded-md space-y-1">
               <div className="flex items-center justify-between font-semibold text-[#18181B]">
-                <span>2. Multimodal Document Extraction (ILlmDocumentExtractor)</span>
+                <span>2. Document Extraction (server-side Gemini)</span>
                 <span className="font-mono text-[11px] text-[#6161F5]">
-                  PHASE 2 INTEGRATION POINT
+                  {health === undefined || health === null
+                    ? 'SERVER NOT REACHED'
+                    : health.aiConfigured
+                    ? `LIVE · ${health.model}`
+                    : 'SERVER KEY NOT SET'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-600">
-                Currently seeded with the 5 Hyderabad Packaging vendor documents (.xlsx, .pdf, .docx, .jpg, .eml). Ready to connect to Gemini Multimodal Vision & Document AI for live PDF/image bounding-box extraction.
+                Uploaded files go to the ProcureIQ server, which reads them with Gemini and checks every cited price against the original text. The Gemini key lives only on the server (GEMINI_API_KEY) and is never sent to the browser. Photos cannot be machine-checked and are always marked for buyer review.
               </p>
             </div>
 
             <div className="p-3 bg-[#FAFAFC] border border-slate-200/90 rounded-md space-y-1">
               <div className="flex items-center justify-between font-semibold text-[#18181B]">
-                <span>3. Conversational Analyst (ILlmProcurementAnalyst)</span>
+                <span>3. Conversational Analyst</span>
                 <span className="font-mono text-[11px] text-[#6161F5]">
-                  PHASE 2 INTEGRATION POINT
+                  {health?.capabilities?.analyst ? 'LIVE (tool-using Gemini)' : 'NOT CONNECTED YET'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-600">
-                Currently uses deterministic dataset computation with explicit Demo Mode labels. Ready to bind to server-side Gemini structured tool-calling over the live quotation state.
+                {health?.capabilities?.analyst
+                  ? 'Questions are answered by Gemini calling controlled server tools; every figure comes from deterministic code.'
+                  : 'The server analyst is not enabled yet; the current analyst view uses fixed rule-based answers and says so.'}
               </p>
             </div>
 
             <div className="p-3 bg-[#FAFAFC] border border-slate-200/90 rounded-md space-y-1">
               <div className="flex items-center justify-between font-semibold text-[#18181B]">
                 <span>4. ERP Purchase Order Connector (SAP Ariba / S4HANA)</span>
-                <span className="font-mono text-[11px] text-slate-500">PLANNED INTEGRATION</span>
+                <span className="font-mono text-[11px] text-slate-500">NOT BUILT</span>
               </div>
               <p className="text-[11px] text-slate-600">
-                Award approval generates a buyer-verified schedule ready for SAP BAPI_PO_CREATE1 payload export.
+                Not implemented. This prototype has no ERP connection and creates no purchase orders.
               </p>
             </div>
           </div>
