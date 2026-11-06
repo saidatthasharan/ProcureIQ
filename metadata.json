@@ -1,0 +1,6 @@
+{
+  "name": "ProcureIQ — Enterprise Procurement Intelligence Platform",
+  "description": "AI-powered enterprise procurement intelligence platform for RFx creation, multi-format vendor quotation extraction, unit/currency standardisation, side-by-side bid comparison, scenario simulation, and evidence-backed award recommendations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

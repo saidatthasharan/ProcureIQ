@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-sans: 'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --aer-primary: #6161F5;
+    --aer-primary-hover: #4F4FE0;
+    --aer-charcoal: #32323A;
+    --aer-surface: #FAFAFC;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: #18181B;
+    background-color: #FAFAFC;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  .font-mono, .tabular-nums {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Sticky column subtle shadow for enterprise comparison matrix */
+.sticky-col-shadow {
+  box-shadow: 2px 0 5px -2px rgba(15, 23, 42, 0.06);
+}
+
+/* Minimal enterprise scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D4D4D8;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A1A1AA;
+}

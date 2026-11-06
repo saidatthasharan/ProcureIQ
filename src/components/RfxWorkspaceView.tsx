@@ -1,0 +1,922 @@
+import React, { useState } from 'react';
+import {
+  Sparkles,
+  Plus,
+  Edit3,
+  Eye,
+  Save,
+  CheckCircle2,
+  Send,
+  FileText,
+  Check,
+  X,
+  ArrowUpRight,
+} from 'lucide-react';
+import {
+  LineItem,
+  PackagingCategory,
+  QuestionnaireQuestion,
+  Vendor,
+} from '../types/procurement';
+import { PROJECT_METADATA } from '../data/seedData';
+import { formatInr, formatLakhs } from '../services/procurementEngine';
+import { TrustBadge } from './GovernanceUI';
+
+interface RfxWorkspaceViewProps {
+  lineItems: LineItem[];
+  questions: QuestionnaireQuestion[];
+  vendors: Vendor[];
+  onUpdateLineItem: (updated: LineItem) => void;
+  onAddLineItem: (newItem: LineItem) => void;
+  onApproveAllItems: () => void;
+  onToggleMandatoryQuestion: (questionId: string) => void;
+  onNotify: (message: string, type?: 'success' | 'info' | 'warning') => void;
+}
+
+interface CopilotChatTurn {
+  id: string;
+  role: 'user' | 'copilot';
+  text: string;
+  meta?: string;
+}
+
+const SUGGESTED_COPILOT_INSTRUCTIONS = [
+  'Structure 30 corrugated packaging items for Hyderabad plant with 15-day delivery & Net 45 terms',
+  'Enforce minimum 18–24 kg/cm² Bursting Strength and ISO 9001 as mandatory hard gates',
+  'Approve all 5 remaining AI-drafted line item specifications for tender release',
+  'Add Cobb60 < 25 g/m² monsoon moisture barrier requirement to export master cartons',
+];
+
+export const RfxWorkspaceView: React.FC<RfxWorkspaceViewProps> = ({
+  lineItems,
+  questions,
+  vendors,
+  onUpdateLineItem,
+  onAddLineItem,
+  onApproveAllItems,
+  onToggleMandatoryQuestion,
+  onNotify,
+}) => {
+  const [copilotInput, setCopilotInput] = useState('');
+  const [copilotHistory, setCopilotHistory] = useState<CopilotChatTurn[]>([
+    {
+      id: 'c-1',
+      role: 'user',
+      text: 'I need 30 corrugated packaging items for our Hyderabad manufacturing plant. Invite five suppliers. All products must meet our quality specifications. Delivery should be within 15 days. Payment terms should be 45 days.',
+    },
+    {
+      id: 'c-2',
+      role: 'copilot',
+      text: 'Generated RFQ-AER-HYD-2026-089 with 30 corrugated packaging line items across 8 categories (₹379.46L baseline), a 12-point vendor qualification questionnaire (4 mandatory QA hard gates), 15-day DDP Pashamylaram delivery, and Net 45 payment terms.',
+      meta: '25 Buyer-Approved · 5 AI-Drafted items ready for review',
+    },
+  ]);
+
+  const [activeRightTab, setActiveRightTab] = useState<
+    'line-items' | 'scope-terms' | 'questionnaire'
+  >('line-items');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [approvalFilter, setApprovalFilter] = useState<
+    'ALL' | 'ai_generated' | 'buyer_approved'
+  >('ALL');
+  const [editingItem, setEditingItem] = useState<LineItem | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+
+  // Commercial conditions state
+  const [rfqTitle, setRfqTitle] = useState(PROJECT_METADATA.name);
+  const [deliveryDays, setDeliveryDays] = useState(PROJECT_METADATA.deliveryRequirementDays);
+  const [paymentDays, setPaymentDays] = useState(PROJECT_METADATA.paymentTermsDays);
+  const [scopeSummary, setScopeSummary] = useState(
+    'Annual rate contract for 30 corrugated packaging SKUs (5-ply heavy export cartons, 3-ply mailers, UN-4G hazardous boxes, edge protectors, honeycomb pads, kraft rolls, and interlocking partitions) delivered DDP to TSIIC Pashamylaram Plant, Hyderabad.'
+  );
+
+  // New line item form state
+  const [newDesc, setNewDesc] = useState('');
+  const [newCat, setNewCat] = useState<PackagingCategory>('5-Ply Corrugated Boxes');
+  const [newSpec, setNewSpec] = useState('180/150/150/150/180 GSM, B+C Flute, Virgin Kraft');
+  const [newBurst, setNewBurst] = useState('Min 20 kg/cm²');
+  const [newDims, setNewDims] = useState('520 x 380 x 340 mm');
+  const [newQty, setNewQty] = useState(10000);
+  const [newUom, setNewUom] = useState<LineItem['standardUom']>('Box');
+  const [newBaseline, setNewBaseline] = useState(75);
+
+  const aiGeneratedCount = lineItems.filter(
+    (i) => i.approvalStatus === 'ai_generated'
+  ).length;
+  const buyerApprovedCount = lineItems.length - aiGeneratedCount;
+  const totalBaselineBudget = lineItems.reduce(
+    (s, i) => s + i.quantity * i.baselineUnitPriceInr,
+    0
+  );
+
+  const filteredItems = lineItems.filter((item) => {
+    if (categoryFilter !== 'ALL' && item.category !== categoryFilter) return false;
+    if (approvalFilter !== 'ALL' && item.approvalStatus !== approvalFilter) return false;
+    return true;
+  });
+
+  const handleSendInstruction = (instructionText: string) => {
+    const clean = instructionText.trim();
+    if (!clean) return;
+
+    const userTurn: CopilotChatTurn = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      text: clean,
+    };
+
+    let replyText =
+      'Synchronised RFx specification table, 15-day delivery SLA, and 12-point vendor qualification gates.';
+    if (clean.toLowerCase().includes('approve all')) {
+      onApproveAllItems();
+      replyText = `Transitioned all ${lineItems.length} line items to Buyer-Approved status.`;
+    } else if (clean.toLowerCase().includes('cobb60') || clean.toLowerCase().includes('moisture')) {
+      setScopeSummary(
+        (prev) => `${prev} Enforced Cobb60 < 25 g/m² monsoon moisture-barrier specification on export master cartons.`
+      );
+      replyText = 'Updated Procurement Scope with Cobb60 < 25 g/m² moisture-barrier test requirement.';
+    } else if (clean.toLowerCase().includes('mandatory') || clean.toLowerCase().includes('bursting')) {
+      setActiveRightTab('questionnaire');
+      replyText =
+        'Verified Mandatory Hard Gates on Q-01 (ISO 9001:2015), Q-02 (18–24 kg/cm² Bursting Lab), Q-07 (Defect Rate <=1%), and Q-09 (Statutory Compliance).';
+    }
+
+    const copilotTurn: CopilotChatTurn = {
+      id: `c-${Date.now() + 1}`,
+      role: 'copilot',
+      text: replyText,
+      meta: 'Demo Simulation Mode · Applied to Live RFQ Preview',
+    };
+
+    setCopilotHistory((prev) => [...prev, userTurn, copilotTurn]);
+    setCopilotInput('');
+    onNotify(replyText, 'info');
+  };
+
+  const handleCreateLineItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDesc.trim()) return;
+    const nextNum = lineItems.length + 1;
+    const id = `PKG-HYD-${String(nextNum).padStart(3, '0')}`;
+    const item: LineItem = {
+      id,
+      code: `CB-CST-${nextNum}`,
+      description: newDesc.trim(),
+      category: newCat,
+      technicalSpec: newSpec,
+      burstingStrengthCS: newBurst,
+      gsmAndFlute: newSpec,
+      dimensionsMm: newDims,
+      quantity: Number(newQty) || 5000,
+      standardUom: newUom,
+      targetDeliveryDays: deliveryDays,
+      qualityRequirement: 'ISO 9001 & Batch Bursting COA Mandatory',
+      expectedPriceMinInr: Math.round(newBaseline * 0.9),
+      expectedPriceMaxInr: Math.round(newBaseline * 1.05),
+      baselineUnitPriceInr: Number(newBaseline) || 75,
+      approvalStatus: 'buyer_approved',
+    };
+    onAddLineItem(item);
+    setShowAddModal(false);
+    setNewDesc('');
+    onNotify(`Added line item ${id} (${item.description}) to RFx scope.`, 'success');
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-lg font-semibold text-slate-900 tracking-tight">
+              RFx Workspace
+            </h1>
+            <TrustBadge type="ai_generated" labelOverride="Conversational Copilot + Live Spec Builder" />
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {PROJECT_METADATA.rfqReference} · {lineItems.length} Line Items ({formatLakhs(totalBaselineBudget)} Baseline) · {buyerApprovedCount} Buyer-Approved, {aiGeneratedCount} AI Draft
+          </p>
+        </div>
+
+        {/* Action Toolbar */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-md inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 text-[#6161F5]" />
+            <span>Add Line Item</span>
+          </button>
+          <button
+            onClick={() => setEditingItem(lineItems[0])}
+            className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-md inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+            <span>Edit Specs</span>
+          </button>
+          <button
+            onClick={() => setShowPreviewModal(true)}
+            className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-md inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <Eye className="w-3.5 h-3.5 text-slate-500" />
+            <span>Preview RFQ</span>
+          </button>
+          <button
+            onClick={() =>
+              onNotify('Draft saved to session state (RFQ-AER-HYD-2026-089).', 'success')
+            }
+            className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-md inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <Save className="w-3.5 h-3.5 text-slate-500" />
+            <span>Save Draft</span>
+          </button>
+          <button
+            onClick={() => {
+              onApproveAllItems();
+              onNotify(
+                `All ${lineItems.length} line items marked as Buyer-Approved.`,
+                'success'
+              );
+            }}
+            className="px-3 py-1.5 text-xs font-medium text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Approve RFQ ({buyerApprovedCount}/{lineItems.length})</span>
+          </button>
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="px-3.5 py-1.5 text-xs font-medium text-white bg-[#6161F5] hover:bg-[#4F4FE0] rounded-md inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Invite Vendors ({vendors.length})</span>
+          </button>
+        </div>
+      </div>
+
+      {/* SPLIT LAYOUT: Left (AI Copilot Conversation) + Right (Live Structured RFQ Preview) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* LEFT PANEL: AI Copilot Conversation */}
+        <div className="lg:col-span-4 bg-white border border-slate-200/90 rounded-lg flex flex-col h-[700px] overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/50">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-[#6161F5] text-white flex items-center justify-center">
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <h2 className="text-xs font-semibold text-slate-900">AI RFx Copilot</h2>
+                <p className="text-[10px] text-slate-500">Conversational Spec & Terms Architect</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400">Demo Mode</span>
+          </div>
+
+          {/* Conversation History */}
+          <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
+            {copilotHistory.map((turn) => (
+              <div
+                key={turn.id}
+                className={`p-3 rounded-lg ${
+                  turn.role === 'user'
+                    ? 'bg-slate-900 text-white ml-4'
+                    : 'bg-slate-50 border border-slate-200/80 text-slate-800 mr-2'
+                }`}
+              >
+                <div className="text-[10px] font-mono opacity-60 mb-1">
+                  {turn.role === 'user' ? 'Buyer Instruction' : 'ProcureIQ Copilot'}
+                </div>
+                <p className="leading-relaxed">{turn.text}</p>
+                {turn.meta && (
+                  <div className="mt-2 pt-1.5 border-t border-slate-200/70 text-[10px] font-mono text-[#6161F5]">
+                    {turn.meta}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Suggested Instructions */}
+            <div className="pt-2 space-y-1.5">
+              <div className="text-[11px] font-medium text-slate-400">
+                Suggested Instructions
+              </div>
+              {SUGGESTED_COPILOT_INSTRUCTIONS.map((inst, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSendInstruction(inst)}
+                  className="w-full text-left p-2.5 text-[11px] text-slate-600 bg-white hover:bg-[#6161F5]/[0.04] hover:text-slate-900 border border-slate-200/80 hover:border-[#6161F5]/30 rounded-md transition-colors flex items-start justify-between gap-2 cursor-pointer"
+                >
+                  <span className="leading-snug">{inst}</span>
+                  <ArrowUpRight className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Prompt Input */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendInstruction(copilotInput);
+            }}
+            className="p-3 border-t border-slate-200/80 bg-slate-50/50 space-y-2"
+          >
+            <textarea
+              rows={2}
+              value={copilotInput}
+              onChange={(e) => setCopilotInput(e.target.value)}
+              placeholder="Instruct Copilot to update line items, tolerances, delivery days, or questionnaire..."
+              className="w-full p-2.5 text-xs bg-white border border-slate-300 rounded-md focus:outline-none focus:border-[#6161F5] resize-none"
+            />
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRightTab('questionnaire');
+                  onNotify('Opened 12-Point Questionnaire in Live RFQ Preview.', 'info');
+                }}
+                className="text-[11px] font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                Generate Questionnaire
+              </button>
+              <button
+                type="submit"
+                className="px-3 py-1.5 text-xs font-medium text-white bg-[#6161F5] hover:bg-[#4F4FE0] rounded-md inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>Generate RFQ Update</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* RIGHT PANEL: Live RFQ Preview & Structured Editor */}
+        <div className="lg:col-span-8 bg-white border border-slate-200/90 rounded-lg flex flex-col h-[700px] overflow-hidden">
+          {/* Right Header Tabs */}
+          <div className="px-4 py-3 border-b border-slate-200/80 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-1 p-0.5 bg-slate-200/70 rounded-md">
+              <button
+                onClick={() => setActiveRightTab('line-items')}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors cursor-pointer ${
+                  activeRightTab === 'line-items'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Line Items ({lineItems.length})
+              </button>
+              <button
+                onClick={() => setActiveRightTab('questionnaire')}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors cursor-pointer ${
+                  activeRightTab === 'questionnaire'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Vendor Questionnaire ({questions.length})
+              </button>
+              <button
+                onClick={() => setActiveRightTab('scope-terms')}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors cursor-pointer ${
+                  activeRightTab === 'scope-terms'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Procurement Scope & Terms
+              </button>
+            </div>
+
+            {activeRightTab === 'line-items' && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-md text-slate-700"
+                >
+                  <option value="ALL">All Categories ({lineItems.length})</option>
+                  <option value="5-Ply Corrugated Boxes">5-Ply Corrugated Boxes</option>
+                  <option value="3-Ply Corrugated Boxes">3-Ply Corrugated Boxes</option>
+                  <option value="Shipping Cartons">Shipping Cartons</option>
+                  <option value="Protective Packaging">Protective Packaging</option>
+                  <option value="Corrugated Sheets">Corrugated Sheets</option>
+                  <option value="Custom-Sized Cartons">Custom-Sized Cartons</option>
+                  <option value="Packaging Rolls">Packaging Rolls</option>
+                  <option value="Die-Cut & Partition Inserts">Die-Cut & Partition Inserts</option>
+                </select>
+                <select
+                  value={approvalFilter}
+                  onChange={(e) =>
+                    setApprovalFilter(
+                      e.target.value as 'ALL' | 'ai_generated' | 'buyer_approved'
+                    )
+                  }
+                  className="px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-md text-slate-700"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="buyer_approved">Buyer Approved ({buyerApprovedCount})</option>
+                  <option value="ai_generated">AI Draft ({aiGeneratedCount})</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Right Body Content */}
+          <div className="flex-1 overflow-y-auto">
+            {activeRightTab === 'line-items' && (
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-slate-50 border-b border-slate-200/80 z-10 text-[11px] font-medium text-slate-500">
+                  <tr>
+                    <th className="py-2.5 px-3">Item ID</th>
+                    <th className="py-2.5 px-3">Description & Dimensions</th>
+                    <th className="py-2.5 px-3">Technical Spec</th>
+                    <th className="py-2.5 px-3 text-right">Qty</th>
+                    <th className="py-2.5 px-3 text-right">Baseline</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3 text-right">Edit</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200/70 text-xs">
+                  {filteredItems.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-2.5 px-3 font-mono font-medium text-slate-900 whitespace-nowrap">
+                        {item.id}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="font-medium text-slate-900">{item.description}</div>
+                        <div className="text-[11px] text-slate-400">
+                          {item.category} · {item.dimensionsMm}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 max-w-[200px]">
+                        <div className="text-slate-700 truncate">{item.gsmAndFlute}</div>
+                        <div className="text-[11px] text-slate-400 truncate">
+                          {item.burstingStrengthCS}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-800 whitespace-nowrap">
+                        {item.quantity.toLocaleString('en-IN')}{' '}
+                        <span className="text-[10px] text-slate-400">{item.standardUom}</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-medium text-slate-900">
+                        ₹{item.baselineUnitPriceInr.toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        {item.approvalStatus === 'ai_generated' ? (
+                          <TrustBadge type="ai_generated" labelOverride="AI Draft" />
+                        ) : (
+                          <TrustBadge type="buyer_verified" labelOverride="Approved" />
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1">
+                          {item.approvalStatus === 'ai_generated' && (
+                            <button
+                              onClick={() => {
+                                onUpdateLineItem({
+                                  ...item,
+                                  approvalStatus: 'buyer_approved',
+                                });
+                                onNotify(`Approved ${item.id}.`, 'success');
+                              }}
+                              className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                              title="Approve AI Draft"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setEditingItem(item)}
+                            className="px-2 py-1 text-[11px] font-medium text-slate-600 hover:text-[#6161F5] hover:bg-slate-100 rounded cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {activeRightTab === 'questionnaire' && (
+              <div className="divide-y divide-slate-200/70">
+                {questions.map((q) => (
+                  <div
+                    key={q.id}
+                    className="p-4 flex items-center justify-between gap-4 hover:bg-slate-50/60"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+                        <span className="text-slate-700 font-semibold">{q.id}</span>
+                        <span>·</span>
+                        <span>{q.category}</span>
+                        <span>·</span>
+                        <span>Weight {q.weightPct}%</span>
+                      </div>
+                      <div className="text-xs font-medium text-slate-900">
+                        {q.questionText}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Threshold: {q.minimumRequirementDescription}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        onToggleMandatoryQuestion(q.id);
+                        onNotify(`Updated gate type for ${q.id}.`, 'info');
+                      }}
+                      className={`px-2.5 py-1 text-[11px] font-medium rounded border shrink-0 cursor-pointer ${
+                        q.mandatoryCriterion
+                          ? 'bg-rose-50 text-rose-800 border-rose-200'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      {q.mandatoryCriterion ? 'Mandatory Gate' : 'Weighted Score'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeRightTab === 'scope-terms' && (
+              <div className="p-6 space-y-5 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-slate-500 mb-1">Project Title</label>
+                    <input
+                      type="text"
+                      value={rfqTitle}
+                      onChange={(e) => setRfqTitle(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-slate-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 mb-1">
+                      Target Delivery SLA (Days)
+                    </label>
+                    <input
+                      type="number"
+                      value={deliveryDays}
+                      onChange={(e) => setDeliveryDays(Number(e.target.value))}
+                      className="w-full px-3 py-1.5 font-mono border border-slate-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 mb-1">
+                      Payment Terms (Net Days)
+                    </label>
+                    <input
+                      type="number"
+                      value={paymentDays}
+                      onChange={(e) => setPaymentDays(Number(e.target.value))}
+                      className="w-full px-3 py-1.5 font-mono border border-slate-300 rounded-md"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">
+                    Procurement Scope & Quality Mandate
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={scopeSummary}
+                    onChange={(e) => setScopeSummary(e.target.value)}
+                    className="w-full p-3 border border-slate-300 rounded-md leading-relaxed"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={() =>
+                      onNotify('Saved RFx scope and commercial terms.', 'success')
+                    }
+                    className="px-4 py-1.5 text-xs font-medium text-white bg-[#6161F5] hover:bg-[#4F4FE0] rounded-md cursor-pointer"
+                  >
+                    Save Scope & Terms
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Specification Modal */}
+      {editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4">
+          <div className="bg-white rounded-lg border border-slate-200 max-w-lg w-full p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-sm font-semibold text-slate-900">
+                Edit Specification — {editingItem.id}
+              </h3>
+              <button
+                onClick={() => setEditingItem(null)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-500 mb-1">Product Description</label>
+                <input
+                  type="text"
+                  value={editingItem.description}
+                  onChange={(e) =>
+                    setEditingItem({ ...editingItem, description: e.target.value })
+                  }
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-md"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-500 mb-1">GSM & Flute</label>
+                  <input
+                    type="text"
+                    value={editingItem.gsmAndFlute}
+                    onChange={(e) =>
+                      setEditingItem({ ...editingItem, gsmAndFlute: e.target.value })
+                    }
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Bursting Strength</label>
+                  <input
+                    type="text"
+                    value={editingItem.burstingStrengthCS}
+                    onChange={(e) =>
+                      setEditingItem({
+                        ...editingItem,
+                        burstingStrengthCS: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-md"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-500 mb-1">
+                    Quantity ({editingItem.standardUom})
+                  </label>
+                  <input
+                    type="number"
+                    value={editingItem.quantity}
+                    onChange={(e) =>
+                      setEditingItem({
+                        ...editingItem,
+                        quantity: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-1.5 font-mono border border-slate-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Baseline Unit Rate (INR)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={editingItem.baselineUnitPriceInr}
+                    onChange={(e) =>
+                      setEditingItem({
+                        ...editingItem,
+                        baselineUnitPriceInr: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-1.5 font-mono border border-slate-300 rounded-md"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+              <button
+                onClick={() => setEditingItem(null)}
+                className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-md cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  onUpdateLineItem({ ...editingItem, approvalStatus: 'buyer_approved' });
+                  setEditingItem(null);
+                  onNotify(`Updated and approved ${editingItem.id}.`, 'success');
+                }}
+                className="px-4 py-1.5 text-xs font-medium text-white bg-[#6161F5] hover:bg-[#4F4FE0] rounded-md cursor-pointer"
+              >
+                Save & Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Line Item Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4">
+          <form
+            onSubmit={handleCreateLineItem}
+            className="bg-white rounded-lg border border-slate-200 max-w-lg w-full p-6 space-y-4 shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-sm font-semibold text-slate-900">Add Line Item</h3>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-500 mb-1">Product Description *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g., 5-Ply Heavy Stator Carton (520x380x340mm)"
+                  value={newDesc}
+                  onChange={(e) => setNewDesc(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-md"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-500 mb-1">Category</label>
+                  <select
+                    value={newCat}
+                    onChange={(e) => setNewCat(e.target.value as PackagingCategory)}
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-md"
+                  >
+                    <option value="5-Ply Corrugated Boxes">5-Ply Corrugated Boxes</option>
+                    <option value="3-Ply Corrugated Boxes">3-Ply Corrugated Boxes</option>
+                    <option value="Shipping Cartons">Shipping Cartons</option>
+                    <option value="Protective Packaging">Protective Packaging</option>
+                    <option value="Corrugated Sheets">Corrugated Sheets</option>
+                    <option value="Custom-Sized Cartons">Custom-Sized Cartons</option>
+                    <option value="Packaging Rolls">Packaging Rolls</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Dimensions (mm)</label>
+                  <input
+                    type="text"
+                    value={newDims}
+                    onChange={(e) => setNewDims(e.target.value)}
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-md"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-500 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    value={newQty}
+                    onChange={(e) => setNewQty(Number(e.target.value))}
+                    className="w-full px-3 py-1.5 font-mono border border-slate-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">UOM</label>
+                  <select
+                    value={newUom}
+                    onChange={(e) => setNewUom(e.target.value as LineItem['standardUom'])}
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-md"
+                  >
+                    <option value="Box">Box</option>
+                    <option value="Piece">Piece</option>
+                    <option value="Sheet">Sheet</option>
+                    <option value="Roll">Roll</option>
+                    <option value="Kg">Kg</option>
+                    <option value="Set">Set</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Baseline (INR)</label>
+                  <input
+                    type="number"
+                    value={newBaseline}
+                    onChange={(e) => setNewBaseline(Number(e.target.value))}
+                    className="w-full px-3 py-1.5 font-mono border border-slate-300 rounded-md"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-md cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 text-xs font-medium text-white bg-[#6161F5] hover:bg-[#4F4FE0] rounded-md cursor-pointer"
+              >
+                Add Line Item
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Preview RFQ Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4">
+          <div className="bg-white rounded-lg border border-slate-200 max-w-2xl w-full max-h-[80vh] flex flex-col overflow-hidden shadow-xl">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[#6161F5]" />
+                <h3 className="text-sm font-semibold text-slate-900">
+                  RFQ Tender Preview — {PROJECT_METADATA.rfqReference}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-4 text-xs">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5">
+                <div className="font-semibold text-sm text-slate-900">{rfqTitle}</div>
+                <div className="text-slate-600 leading-relaxed">{scopeSummary}</div>
+                <div className="pt-2 flex flex-wrap gap-4 text-slate-700 font-mono text-[11px]">
+                  <span>Delivery: DDP &le;{deliveryDays}d</span>
+                  <span>Payment: Net {paymentDays}d</span>
+                  <span>Baseline: {formatInr(totalBaselineBudget)}</span>
+                  <span>Items: {lineItems.length}</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {vendors.map((v) => (
+                  <div key={v.id} className="p-3 border border-slate-200 rounded-md">
+                    <div className="font-medium text-slate-900">{v.name}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {v.contactPerson} · {v.contactEmail}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                className="px-4 py-1.5 text-xs font-medium bg-[#32323A] text-white rounded-md cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invite Vendors Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4">
+          <div className="bg-white rounded-lg border border-slate-200 max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 className="text-sm font-semibold text-slate-900">
+              Invited Suppliers ({vendors.length})
+            </h3>
+            <p className="text-xs text-slate-500">
+              All 5 pre-qualified suppliers are registered on {PROJECT_METADATA.rfqReference}:
+            </p>
+            <ul className="space-y-2 text-xs">
+              {vendors.map((v) => (
+                <li
+                  key={v.id}
+                  className="flex items-center justify-between p-2.5 bg-slate-50 rounded border border-slate-200"
+                >
+                  <span className="font-medium text-slate-900">{v.name}</span>
+                  <span className="text-emerald-700 font-mono text-[11px]">
+                    Response Logged
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowInviteModal(false)}
+                className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-md cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowInviteModal(false);
+                  onNotify('Dispatched specification addendum to all 5 suppliers.', 'success');
+                }}
+                className="px-4 py-1.5 text-xs font-medium text-white bg-[#6161F5] hover:bg-[#4F4FE0] rounded-md cursor-pointer"
+              >
+                Dispatch Addendum
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
