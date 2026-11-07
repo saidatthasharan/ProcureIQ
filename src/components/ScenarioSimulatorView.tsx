@@ -61,11 +61,7 @@ export const ScenarioSimulatorView: React.FC<ScenarioSimulatorViewProps> = ({
     (v) => v.processingStatus === 'extracted_NeedsReview' || v.processingStatus === 'verified'
   ).length;
 
-  const effectiveVendors: Vendor[] = vendors.map((v) => ({
-    ...v,
-    processingStatus:
-      v.processingStatus === 'unextracted' ? 'extracted_NeedsReview' : v.processingStatus,
-  }));
+  const effectiveVendors: Vendor[] = vendors;
 
   const currentResult = evaluateScenario(
     scenarioConfig,
@@ -397,7 +393,7 @@ export const ScenarioSimulatorView: React.FC<ScenarioSimulatorViewProps> = ({
                   Enforce Mandatory Quality Gate
                 </div>
                 <div className="text-[11px] text-slate-500">
-                  Excludes Southern Box Mfg. (failed ISO 9001 & 14 kg/cm² Burst).
+                  Excludes any supplier that fails a mandatory question.
                 </div>
               </div>
             </label>
@@ -441,7 +437,7 @@ export const ScenarioSimulatorView: React.FC<ScenarioSimulatorViewProps> = ({
                   Include Unverified Historical / Unit Assumptions
                 </div>
                 <div className="text-[11px] text-slate-500">
-                  Allows EcoWrap 2025 rates & Pallet UOM before manual verification.
+                  Lets assumption-based prices (e.g. unstated tax or freight) count before a buyer confirms them. Past-price references and unknown units never get a price.
                 </div>
               </div>
             </label>

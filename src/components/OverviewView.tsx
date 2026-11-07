@@ -52,6 +52,8 @@ interface OverviewViewProps {
   onNavigate: (workspace: WorkspaceId, filterHint?: string) => void;
   onExtractAllVendors: () => void;
   isExtractingAll: boolean;
+  /** Real actions taken in this session (extractions, buyer verifications). */
+  auditLog?: { at: string; actor: 'buyer' | 'system'; action: string; detail: string }[];
 }
 
 export const OverviewView: React.FC<OverviewViewProps> = ({
@@ -64,6 +66,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onNavigate,
   onExtractAllVendors,
   isExtractingAll,
+  auditLog = [],
 }) => {
   const totalBaselineValue = lineItems.reduce(
     (sum, item) => sum + item.quantity * item.baselineUnitPriceInr,
@@ -79,11 +82,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     (e) => e.status !== 'Resolved (Buyer Verified)'
   );
 
-  const effectiveVendorsForCalc: Vendor[] = vendors.map((v) => ({
-    ...v,
-    processingStatus:
-      v.processingStatus === 'unextracted' ? 'extracted_NeedsReview' : v.processingStatus,
-  }));
+  const effectiveVendorsForCalc: Vendor[] = vendors;
 
   const optimalSplit = evaluateScenario(
     {
@@ -106,19 +105,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     exceptions
   );
 
-  const cycleProgressPct = Math.min(
-    95,
-    Math.round(
-      45 +
-        (processedVendors.length / vendors.length) * 30 +
-        ((exceptions.length - openExceptions.length) / Math.max(1, exceptions.length)) * 20
-    )
-  );
+  // Share of the review work that has really been done: documents processed + exceptions resolved.
+  const reviewUnitsTotal = vendors.length + exceptions.length;
+  const reviewUnitsDone = processedVendors.length + (exceptions.length - openExceptions.length);
+  const cycleProgressPct = reviewUnitsTotal ? Math.round((reviewUnitsDone / reviewUnitsTotal) * 100) : 0;
 
   const workflowStages = [
-    { label: 'RFQ Created', detail: '30 SKUs · Oct 28', state: 'completed' },
-    { label: 'Vendors Invited', detail: '5 Suppliers', state: 'completed' },
-    { label: 'Responses Received', detail: '5 Formats Logged', state: 'completed' },
+    { label: 'RFQ Created', detail: `${lineItems.length} SKUs`, state: 'completed' },
+    { label: 'Vendors Invited', detail: `${vendors.length} Suppliers`, state: 'completed' },
+    { label: 'Responses Received', detail: `${processedVendors.length}/${vendors.length} processed`, state: processedVendors.length ? 'completed' : 'upcoming' },
     {
       label: 'Evaluation',
       detail: allExtracted
@@ -126,7 +121,27 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         : `${processedVendors.length}/5 Extracted`,
       state: 'current',
     },
-    { label: 'Award', detail: 'Pending VP Sign-off', state: 'upcoming' },
+    { label: 'Award', detail: 'Needs buyer approval', state: 'upcoming' },
+  ];
+
+  const openBy = (t: string) => openExceptions.filter((e) => e.type === t);
+  const vendorShort = (id: string) => vendors.find((v) => v.id === id)?.shortName ?? id;
+  const missingSlots = quoteCells.filter((c) => c.blockReasons?.includes('not_mentioned') || c.blockReasons?.includes('not_quoted')).length;
+  const unresolvedAI = lineItems.filter((i) => i.approvalStatus === 'ai_generated').length;
+  const pendingActions: { title: string; detail: string; target: WorkspaceId; hint?: string }[] = [
+    ...(processedVendors.length < vendors.length
+      ? [{ title: `${vendors.length - processedVendors.length} vendor document(s) not processed yet`, detail: 'Upload or extract them in Vendor Responses.', target: 'vendor-responses' as WorkspaceId, hint: 'all' }]
+      : []),
+    ...(processedVendors.length && missingSlots
+      ? [{ title: `Missing vendor quotations (${missingSlots} supplier-item slots)`, detail: 'Items a supplier did not mention or declined to quote.', target: 'bid-comparison' as WorkspaceId, hint: 'missing' }]
+      : []),
+    ...(openBy('low_confidence').length || openBy('conflicting_values').length || openBy('ambiguous_price').length
+      ? [{ title: `Low-confidence or conflicting values (${openBy('low_confidence').length + openBy('conflicting_values').length + openBy('ambiguous_price').length})`, detail: [...new Set([...openBy('low_confidence'), ...openBy('conflicting_values'), ...openBy('ambiguous_price')].map((e) => vendorShort(e.vendorId)))].join(', '), target: 'document-intelligence' as WorkspaceId, hint: 'exceptions' }]
+      : []),
+    ...(openBy('unknown_unit').length || openBy('historical_reference').length
+      ? [{ title: `Unresolved units and past-price references (${openBy('unknown_unit').length + openBy('historical_reference').length})`, detail: [...new Set([...openBy('unknown_unit'), ...openBy('historical_reference')].map((e) => vendorShort(e.vendorId)))].join(', '), target: 'document-intelligence' as WorkspaceId, hint: 'exceptions' }]
+      : []),
+    ...(unresolvedAI ? [{ title: `${unresolvedAI} AI-drafted RFx item(s) awaiting approval`, detail: 'Approve or edit them in RFx Workspace.', target: 'rfx-workspace' as WorkspaceId }] : []),
   ];
 
   const compactKpis = [
@@ -141,7 +156,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     {
       label: 'Vendors Invited',
       value: `${vendors.length}`,
-      sub: '4 Qualified · 1 QA Disqualified',
+      sub: `${vendors.filter((v) => calculateVendorQualification(v.id, questions, responses).passedAllMandatory).length} pass mandatory questions · ${vendors.filter((v) => !calculateVendorQualification(v.id, questions, responses).passedAllMandatory).length} fail (sample answers)`,
       icon: Users,
       target: 'bid-comparison' as WorkspaceId,
       hint: 'questionnaire',
@@ -150,8 +165,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       label: 'Responses Received',
       value: `${vendors.length} / ${vendors.length}`,
       sub: allExtracted
-        ? 'All 5 documents extracted'
-        : `${processedVendors.length}/5 extracted`,
+        ? `All ${vendors.length} documents processed`
+        : `${processedVendors.length}/${vendors.length} processed`,
       icon: Inbox,
       target: 'vendor-responses' as WorkspaceId,
       hint: 'all',
@@ -159,7 +174,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     {
       label: 'Line Items Evaluated',
       value: `${lineItems.length}`,
-      sub: '8 Corrugated Categories',
+      sub: `${new Set(lineItems.map((i) => i.category)).size} categories`,
       icon: Layers,
       target: 'bid-comparison' as WorkspaceId,
       hint: 'all',
@@ -167,7 +182,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     {
       label: 'Pending Exceptions',
       value: `${openExceptions.length}`,
-      sub: 'OCR, UOM & Historical Refs',
+      sub: 'From real extraction runs',
       icon: AlertCircle,
       target: 'document-intelligence' as WorkspaceId,
       hint: 'exceptions',
@@ -269,7 +284,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               className="px-3 py-1.5 text-xs font-medium text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md inline-flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Play className="w-3 h-3 fill-amber-700 text-amber-700" />
-              <span>{isExtractingAll ? 'Extracting...' : `Extract Bids (${5 - processedVendors.length})`}</span>
+              <span>{isExtractingAll ? 'Extracting...' : `Extract Bids (${vendors.length - processedVendors.length})`}</span>
             </button>
           )}
           <button
@@ -506,71 +521,29 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 </p>
               </div>
               <span className="text-[11px] font-mono font-medium text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
-                4 Action Groups
+                {pendingActions.length} Action Group{pendingActions.length === 1 ? '' : 's'}
               </span>
             </div>
 
             <div className="divide-y divide-slate-200/70 text-xs">
-              <button
-                onClick={() => onNavigate('bid-comparison', 'missing')}
-                className="w-full p-4 text-left hover:bg-slate-50 transition-colors flex items-start justify-between gap-3 cursor-pointer"
-              >
-                <div className="space-y-0.5">
-                  <div className="font-medium text-slate-900">
-                    Missing vendor quotations (11 slots across 2 vendors)
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    PrimePack quoted 27/30 (omitted 027, 028, 030) · EcoWrap quoted 22/30 (omitted 8 custom items).
-                  </div>
+              {pendingActions.length === 0 && (
+                <div className="p-4 text-[11px] text-slate-500">
+                  No pending actions yet. Extract the vendor documents to see what needs your attention.
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-              </button>
-
-              <button
-                onClick={() => onNavigate('document-intelligence', 'V-SOUTHERN')}
-                className="w-full p-4 text-left hover:bg-slate-50 transition-colors flex items-start justify-between gap-3 cursor-pointer"
-              >
-                <div className="space-y-0.5">
-                  <div className="font-medium text-slate-900">
-                    Low-confidence OCR & conflicting values (2 vendors)
+              )}
+              {pendingActions.map((a, i) => (
+                <button
+                  key={i}
+                  onClick={() => onNavigate(a.target, a.hint)}
+                  className="w-full p-4 text-left hover:bg-slate-50 transition-colors flex items-start justify-between gap-3 cursor-pointer"
+                >
+                  <div className="space-y-0.5">
+                    <div className="font-medium text-slate-900">{a.title}</div>
+                    <div className="text-[11px] text-slate-500">{a.detail}</div>
                   </div>
-                  <div className="text-[11px] text-slate-500">
-                    Southern Box angled rate card (61.5% OCR) & PrimePack Item 012 paragraph conflict.
-                  </div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-              </button>
-
-              <button
-                onClick={() => onNavigate('document-intelligence', 'V-ECOWRAP')}
-                className="w-full p-4 text-left hover:bg-slate-50 transition-colors flex items-start justify-between gap-3 cursor-pointer"
-              >
-                <div className="space-y-0.5">
-                  <div className="font-medium text-slate-900">
-                    Unresolved unit conversion & historical pricing
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    EcoWrap Item 019 quoted per "Pallet Load" & 3 items reference Q3 2025 PO rates.
-                  </div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-              </button>
-
-              <button
-                onClick={() => onNavigate('bid-comparison', 'questionnaire')}
-                className="w-full p-4 text-left hover:bg-slate-50 transition-colors flex items-start justify-between gap-3 cursor-pointer"
-              >
-                <div className="space-y-0.5">
-                  <div className="font-medium text-slate-900">
-                    Questionnaire disqualification & AI spec sign-off
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    Southern Box failed mandatory ISO/Bursting check ·{' '}
-                    {lineItems.filter((i) => i.approvalStatus === 'ai_generated').length} AI specs to approve.
-                  </div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-              </button>
+                  <ArrowUpRight className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                </button>
+              ))}
             </div>
           </div>
 
@@ -649,40 +622,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <div>
               <h2 className="text-xs font-semibold text-slate-900">Recent Activity</h2>
               <p className="text-[11px] text-slate-500">
-                Chronological sourcing & document audit trail
+                This session's actions (not stored after you close the page)
               </p>
             </div>
             <span className="text-[11px] font-mono text-slate-400">IST (UTC+5:30)</span>
           </div>
 
           <div className="divide-y divide-slate-100 text-xs">
-            {[
-              {
-                time: 'Nov 04 · 16:08',
-                event: 'EcoWrap Packaging submitted inline email quotation (.eml)',
-                meta: '22 of 30 items quoted · 3 historical 2025 rate references flagged',
-              },
-              {
-                time: 'Nov 04 · 11:50',
-                event: 'Southern Box Mfg. uploaded signed rate-card photograph (.jpg)',
-                meta: 'Disqualified on mandatory ISO 9001 & 14 kg/cm² Bursting QA gate',
-              },
-              {
-                time: 'Nov 04 · 09:15',
-                event: 'PrimePack Solutions submitted narrative proposal (.docx)',
-                meta: '27 of 30 items extracted from paragraphs · Ex-Works +3.5% freight rule applied',
-              },
-              {
-                time: 'Nov 03 · 17:45',
-                event: 'Global Corrugators (.pdf) & Apex Packaging (.xlsx) bids logged',
-                meta: 'Page-3 4.5% volume discount footnote & bundle UOM conversions detected',
-              },
-              {
-                time: 'Oct 28 · 10:00',
-                event: 'RFQ-AER-HYD-2026-089 published to 5 packaging suppliers',
-                meta: '30 corrugated packaging SKUs · Net 45 Days · 15-Day Delivery SLA',
-              },
-            ].map((act, idx) => (
+            {auditLog.length === 0 && (
+              <div className="py-3 text-[11px] text-slate-500">No activity yet in this session.</div>
+            )}
+            {[...auditLog].reverse().slice(0, 8).map((a) => ({ time: new Date(a.at).toLocaleTimeString(), event: `${a.actor === 'buyer' ? 'Buyer' : 'System'}: ${a.action.replace(/_/g, ' ')}`, meta: a.detail })).map((act, idx) => (
               <div key={idx} className="py-2.5 flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="font-medium text-slate-900 truncate">{act.event}</div>

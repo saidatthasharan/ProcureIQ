@@ -61,6 +61,7 @@ export const BidComparisonView: React.FC<BidComparisonViewProps> = ({
   const [sortBy, setSortBy] = useState<'id' | 'qty' | 'lowestPrice' | 'spend'>('id');
   const [sortAsc, setSortAsc] = useState(true);
 
+  const qualifiedCount = vendors.filter((v) => calculateVendorQualification(v.id, questions, responses).passedAllMandatory).length;
   const extractedVendorsCount = vendors.filter(
     (v) => v.processingStatus === 'extracted_NeedsReview' || v.processingStatus === 'verified'
   ).length;
@@ -261,13 +262,13 @@ export const BidComparisonView: React.FC<BidComparisonViewProps> = ({
           <div className="text-sm font-semibold font-mono text-emerald-700 mt-0.5">
             {extractedVendorsCount > 0
               ? `${formatLakhs(totalSavings)} (${savingsPct}%)`
-              : '₹36.81 L (Projected)'}
+              : 'Pending extraction'}
           </div>
         </div>
         <div className="px-4 py-3">
           <div className="text-[11px] text-slate-400">Quality Eligibility</div>
           <div className="text-sm font-semibold text-slate-900 mt-0.5">
-            4 Qualified · <span className="text-rose-700 font-normal">1 Disqualified</span>
+            {qualifiedCount} Qualified · <span className="text-rose-700 font-normal">{vendors.length - qualifiedCount} Disqualified</span>
           </div>
         </div>
         <div className="px-4 py-3 flex items-center justify-between">
@@ -568,7 +569,7 @@ export const BidComparisonView: React.FC<BidComparisonViewProps> = ({
                 12-Criterion Technical & Quality Qualification Matrix
               </h3>
               <p className="text-[11px] text-slate-500">
-                Southern Box Manufacturing failed 3 mandatory gates (ISO 9001, 18+ kg/cm² Bursting Lab, &le;1% Defect Rate) and is hard-disqualified.
+                Outcomes below use the sample questionnaire answers supplied with the project (not read from vendor files, not buyer-verified). A supplier that fails a mandatory question is excluded from awards while the gate is enforced.
               </p>
             </div>
             <span className="text-[11px] text-slate-500">

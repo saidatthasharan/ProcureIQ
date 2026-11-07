@@ -1,0 +1,1422 @@
+{
+  "generatedBy": "scripts/generate-fixtures.ts",
+  "fxRateUsed": 83.5,
+  "vendors": {
+    "V-APEX": {
+      "file": "Apex_HydPlant_Quotation_2026_ModifiedCols.xlsx",
+      "format": "xlsx",
+      "items": {
+        "PKG-HYD-001": {
+          "status": "quoted",
+          "written": {
+            "price": 88.35,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 88.35
+        },
+        "PKG-HYD-002": {
+          "status": "quoted",
+          "written": {
+            "price": 65.52,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 65.52
+        },
+        "PKG-HYD-003": {
+          "status": "quoted",
+          "written": {
+            "price": 116.56,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 116.56
+        },
+        "PKG-HYD-004": {
+          "status": "quoted",
+          "written": {
+            "price": 48.3,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 48.3
+        },
+        "PKG-HYD-005": {
+          "status": "quoted",
+          "written": {
+            "price": 83.6,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 83.6
+        },
+        "PKG-HYD-006": {
+          "status": "quoted",
+          "written": {
+            "price": 121.94,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 121.94
+        },
+        "PKG-HYD-007": {
+          "status": "quoted",
+          "written": {
+            "price": 1780,
+            "currency": "INR",
+            "unit": "100 Pieces"
+          },
+          "expectedNormalisedInr": 17.8
+        },
+        "PKG-HYD-008": {
+          "status": "quoted",
+          "written": {
+            "price": 1440,
+            "currency": "INR",
+            "unit": "100 Pieces"
+          },
+          "expectedNormalisedInr": 14.4
+        },
+        "PKG-HYD-009": {
+          "status": "quoted",
+          "written": {
+            "price": 27.73,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 27.73
+        },
+        "PKG-HYD-010": {
+          "status": "quoted",
+          "written": {
+            "price": 22.08,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 22.08
+        },
+        "PKG-HYD-011": {
+          "status": "quoted",
+          "written": {
+            "price": 69.16,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 69.16
+        },
+        "PKG-HYD-012": {
+          "status": "quoted",
+          "written": {
+            "price": 77.28,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 77.28
+        },
+        "PKG-HYD-013": {
+          "status": "quoted",
+          "written": {
+            "price": 56.05,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 56.05
+        },
+        "PKG-HYD-014": {
+          "status": "quoted",
+          "written": {
+            "price": 99.84,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 99.84
+        },
+        "PKG-HYD-015": {
+          "status": "quoted",
+          "written": {
+            "price": 16.45,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 16.45
+        },
+        "PKG-HYD-016": {
+          "status": "quoted",
+          "written": {
+            "price": 112.1,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 112.1
+        },
+        "PKG-HYD-017": {
+          "status": "quoted",
+          "written": {
+            "price": 7.63,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 7.63
+        },
+        "PKG-HYD-018": {
+          "status": "quoted",
+          "written": {
+            "price": 66.74,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 66.74
+        },
+        "PKG-HYD-019": {
+          "status": "quoted",
+          "written": {
+            "price": 36.27,
+            "currency": "INR",
+            "unit": "Sheet"
+          },
+          "expectedNormalisedInr": 36.27
+        },
+        "PKG-HYD-020": {
+          "status": "quoted",
+          "written": {
+            "price": 6.9,
+            "currency": "INR",
+            "unit": "Sheet"
+          },
+          "expectedNormalisedInr": 6.9
+        },
+        "PKG-HYD-021": {
+          "status": "quoted",
+          "written": {
+            "price": 59480,
+            "currency": "INR",
+            "unit": "Metric Tonne"
+          },
+          "expectedNormalisedInr": 59.48
+        },
+        "PKG-HYD-022": {
+          "status": "quoted",
+          "written": {
+            "price": 100.44,
+            "currency": "INR",
+            "unit": "Set"
+          },
+          "expectedNormalisedInr": 100.44
+        },
+        "PKG-HYD-023": {
+          "status": "quoted",
+          "written": {
+            "price": 80.99,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 80.99
+        },
+        "PKG-HYD-024": {
+          "status": "quoted",
+          "written": {
+            "price": 85.56,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 85.56
+        },
+        "PKG-HYD-025": {
+          "status": "quoted",
+          "written": {
+            "price": 24.18,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 24.18
+        },
+        "PKG-HYD-026": {
+          "status": "quoted",
+          "written": {
+            "price": 517.75,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 517.75
+        },
+        "PKG-HYD-027": {
+          "status": "quoted",
+          "written": {
+            "price": 385.4,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 385.4
+        },
+        "PKG-HYD-028": {
+          "status": "quoted",
+          "written": {
+            "price": 869.25,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 869.25
+        },
+        "PKG-HYD-029": {
+          "status": "quoted",
+          "written": {
+            "price": 26.22,
+            "currency": "INR",
+            "unit": "Set"
+          },
+          "expectedNormalisedInr": 26.22
+        },
+        "PKG-HYD-030": {
+          "status": "quoted",
+          "written": {
+            "price": 31.62,
+            "currency": "INR",
+            "unit": "Set"
+          },
+          "expectedNormalisedInr": 31.62
+        }
+      },
+      "terms": {
+        "payment": "Net 45 Days",
+        "leadTimeDays": 12,
+        "freight": "included (DDP)",
+        "gst": "extra 18%",
+        "discount": null
+      }
+    },
+    "V-GLOBAL": {
+      "file": "GlobalCorrugators_CommercialBid_HYD2026.pdf",
+      "format": "pdf",
+      "items": {
+        "PKG-HYD-001": {
+          "status": "quoted",
+          "written": {
+            "price": 1.087,
+            "currency": "USD",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 86.68,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-002": {
+          "status": "quoted",
+          "written": {
+            "price": 0.828,
+            "currency": "USD",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 66.03,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-003": {
+          "status": "quoted",
+          "written": {
+            "price": 1.411,
+            "currency": "USD",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 112.52,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-004": {
+          "status": "quoted",
+          "written": {
+            "price": 0.597,
+            "currency": "USD",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 47.61,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-005": {
+          "status": "quoted",
+          "written": {
+            "price": 1.012,
+            "currency": "USD",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 80.7,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-006": {
+          "status": "quoted",
+          "written": {
+            "price": 127.3,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 121.57,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-007": {
+          "status": "quoted",
+          "written": {
+            "price": 18.72,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 17.88,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-008": {
+          "status": "quoted",
+          "written": {
+            "price": 15.2,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 14.52,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-009": {
+          "status": "quoted",
+          "written": {
+            "price": 28.03,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 26.77,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-010": {
+          "status": "quoted",
+          "written": {
+            "price": 23.04,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 22,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-011": {
+          "status": "quoted",
+          "written": {
+            "price": 72.96,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 69.68,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-012": {
+          "status": "quoted",
+          "written": {
+            "price": 79.8,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 76.21,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-013": {
+          "status": "quoted",
+          "written": {
+            "price": 55.46,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 52.96,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-014": {
+          "status": "quoted",
+          "written": {
+            "price": 96.72,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 92.37,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-015": {
+          "status": "quoted",
+          "written": {
+            "price": 16.97,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 16.21,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-016": {
+          "status": "quoted",
+          "written": {
+            "price": 113.28,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 108.18,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-017": {
+          "status": "quoted",
+          "written": {
+            "price": 7.79,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 7.44,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-018": {
+          "status": "quoted",
+          "written": {
+            "price": 67.45,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 64.41,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-019": {
+          "status": "quoted",
+          "written": {
+            "price": 37.44,
+            "currency": "INR",
+            "unit": "Sheet"
+          },
+          "expectedNormalisedInr": 35.76,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-020": {
+          "status": "quoted",
+          "written": {
+            "price": 7.2,
+            "currency": "INR",
+            "unit": "Sheet"
+          },
+          "expectedNormalisedInr": 6.88,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-021": {
+          "status": "quoted",
+          "written": {
+            "price": 62.4,
+            "currency": "INR",
+            "unit": "Kg"
+          },
+          "expectedNormalisedInr": 59.59,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-022": {
+          "status": "quoted",
+          "written": {
+            "price": 101.52,
+            "currency": "INR",
+            "unit": "Set"
+          },
+          "expectedNormalisedInr": 96.95,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-023": {
+          "status": "quoted",
+          "written": {
+            "price": 84.55,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 80.75,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-024": {
+          "status": "quoted",
+          "written": {
+            "price": 87.42,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 83.49,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-025": {
+          "status": "quoted",
+          "written": {
+            "price": 24.7,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 23.59,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-026": {
+          "status": "quoted",
+          "written": {
+            "price": 528.65,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 504.86,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-027": {
+          "status": "quoted",
+          "written": {
+            "price": 393.6,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 375.89,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-028": {
+          "status": "quoted",
+          "written": {
+            "price": 860.1,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 821.4,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-029": {
+          "status": "quoted",
+          "written": {
+            "price": 26.79,
+            "currency": "INR",
+            "unit": "Set"
+          },
+          "expectedNormalisedInr": 25.58,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        },
+        "PKG-HYD-030": {
+          "status": "quoted",
+          "written": {
+            "price": 31.62,
+            "currency": "INR",
+            "unit": "Set"
+          },
+          "expectedNormalisedInr": 30.2,
+          "note": "Conditional 4.5% rebate (page 3 footnote) applied in expected value"
+        }
+      },
+      "terms": {
+        "payment": "Net 45 Days",
+        "leadTimeDays": 14,
+        "freight": "included (DDP)",
+        "gst": "extra 18%",
+        "discount": {
+          "percent": 4.5,
+          "minAwardValueInr": 2500000,
+          "location": "page 3 footnote"
+        }
+      }
+    },
+    "V-PRIMEPACK": {
+      "file": "PrimePack_Proposal_Narrative_2026.docx",
+      "format": "docx",
+      "items": {
+        "PKG-HYD-001": {
+          "status": "quoted",
+          "written": {
+            "price": 88.35,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 91.44
+        },
+        "PKG-HYD-002": {
+          "status": "quoted",
+          "written": {
+            "price": 66.24,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 68.56
+        },
+        "PKG-HYD-003": {
+          "status": "quoted",
+          "written": {
+            "price": 115.32,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 119.36
+        },
+        "PKG-HYD-004": {
+          "status": "quoted",
+          "written": {
+            "price": 47.78,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 49.45
+        },
+        "PKG-HYD-005": {
+          "status": "quoted",
+          "written": {
+            "price": 82.72,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 85.62
+        },
+        "PKG-HYD-006": {
+          "status": "quoted",
+          "written": {
+            "price": 124.62,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 128.98
+        },
+        "PKG-HYD-007": {
+          "status": "quoted",
+          "written": {
+            "price": 17.36,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 17.97
+        },
+        "PKG-HYD-008": {
+          "status": "quoted",
+          "written": {
+            "price": 14.08,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 14.57
+        },
+        "PKG-HYD-009": {
+          "status": "quoted",
+          "written": {
+            "price": 26.26,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 27.18
+        },
+        "PKG-HYD-010": {
+          "status": "quoted",
+          "written": {
+            "price": 21.12,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 21.86
+        },
+        "PKG-HYD-011": {
+          "status": "quoted",
+          "written": {
+            "price": 68.4,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 70.79
+        },
+        "PKG-HYD-013": {
+          "status": "quoted",
+          "written": {
+            "price": 53.69,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 55.57
+        },
+        "PKG-HYD-014": {
+          "status": "quoted",
+          "written": {
+            "price": 97.76,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 101.18
+        },
+        "PKG-HYD-019": {
+          "status": "quoted",
+          "written": {
+            "price": 35.88,
+            "currency": "INR",
+            "unit": "Sheet"
+          },
+          "expectedNormalisedInr": 37.14
+        },
+        "PKG-HYD-020": {
+          "status": "quoted",
+          "written": {
+            "price": 6.75,
+            "currency": "INR",
+            "unit": "Sheet"
+          },
+          "expectedNormalisedInr": 6.99
+        },
+        "PKG-HYD-021": {
+          "status": "quoted",
+          "written": {
+            "price": 60.45,
+            "currency": "INR",
+            "unit": "Kg"
+          },
+          "expectedNormalisedInr": 62.57
+        },
+        "PKG-HYD-022": {
+          "status": "quoted",
+          "written": {
+            "price": 98.28,
+            "currency": "INR",
+            "unit": "Set"
+          },
+          "expectedNormalisedInr": 101.72
+        },
+        "PKG-HYD-023": {
+          "status": "quoted",
+          "written": {
+            "price": 81.88,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 84.75
+        },
+        "PKG-HYD-024": {
+          "status": "quoted",
+          "written": {
+            "price": 84.63,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 87.59
+        },
+        "PKG-HYD-025": {
+          "status": "quoted",
+          "written": {
+            "price": 23.14,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 23.95
+        },
+        "PKG-HYD-026": {
+          "status": "quoted",
+          "written": {
+            "price": 506.85,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 524.59
+        },
+        "PKG-HYD-029": {
+          "status": "quoted",
+          "written": {
+            "price": 25.37,
+            "currency": "INR",
+            "unit": "Set"
+          },
+          "expectedNormalisedInr": 26.26
+        },
+        "PKG-HYD-027": {
+          "status": "not_quoted",
+          "written": null,
+          "expectedNormalisedInr": null
+        },
+        "PKG-HYD-028": {
+          "status": "not_quoted",
+          "written": null,
+          "expectedNormalisedInr": null
+        },
+        "PKG-HYD-030": {
+          "status": "not_quoted",
+          "written": null,
+          "expectedNormalisedInr": null
+        },
+        "PKG-HYD-012": {
+          "status": "quoted",
+          "written": {
+            "price": 79.5,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": null,
+          "note": "CONFLICT: executive summary says 74.76, Schedule B says 79.50. Must be flagged, neither used."
+        },
+        "PKG-HYD-015": {
+          "status": "quoted",
+          "written": {
+            "price": 16.1,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 16.66
+        },
+        "PKG-HYD-016": {
+          "status": "quoted",
+          "written": {
+            "price": 109.74,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 113.58
+        },
+        "PKG-HYD-017": {
+          "status": "quoted",
+          "written": {
+            "price": 7.38,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 7.64
+        },
+        "PKG-HYD-018": {
+          "status": "quoted",
+          "written": {
+            "price": 64.61,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 66.87
+        }
+      },
+      "terms": {
+        "payment": "Net 45 Days",
+        "leadTimeDays": 15,
+        "freight": "extra 3.5% (ex-works)",
+        "gst": "extra 18%",
+        "discount": null,
+        "conflictItem": "PKG-HYD-012"
+      }
+    },
+    "V-SOUTHERN": {
+      "file": "IMG_20261104_114822_SignedRateCard.jpg",
+      "format": "image",
+      "items": {
+        "PKG-HYD-001": {
+          "status": "quoted",
+          "written": {
+            "price": 92.7,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 81.7
+        },
+        "PKG-HYD-002": {
+          "status": "quoted",
+          "written": {
+            "price": 69.44,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 61.2
+        },
+        "PKG-HYD-003": {
+          "status": "quoted",
+          "written": {
+            "price": 123.81,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 109.12
+        },
+        "PKG-HYD-004": {
+          "status": "quoted",
+          "written": {
+            "price": 50.04,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 44.1,
+          "note": "Printed value struck through; handwritten correction is the valid price"
+        },
+        "PKG-HYD-005": {
+          "status": "quoted",
+          "written": {
+            "price": 88.86,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 78.32
+        },
+        "PKG-HYD-006": {
+          "status": "quoted",
+          "written": {
+            "price": 130.75,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 115.24
+        },
+        "PKG-HYD-007": {
+          "status": "quoted",
+          "written": {
+            "price": 18.81,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 16.58
+        },
+        "PKG-HYD-008": {
+          "status": "quoted",
+          "written": {
+            "price": 15.25,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 13.44
+        },
+        "PKG-HYD-009": {
+          "status": "quoted",
+          "written": {
+            "price": 28.79,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 25.37
+        },
+        "PKG-HYD-010": {
+          "status": "quoted",
+          "written": {
+            "price": 23.15,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 20.4
+        },
+        "PKG-HYD-011": {
+          "status": "quoted",
+          "written": {
+            "price": 73.3,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 64.6
+        },
+        "PKG-HYD-012": {
+          "status": "quoted",
+          "written": {
+            "price": 81.96,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 72.24
+        },
+        "PKG-HYD-013": {
+          "status": "quoted",
+          "written": {
+            "price": 58.91,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 51.92
+        },
+        "PKG-HYD-014": {
+          "status": "quoted",
+          "written": {
+            "price": 107.38,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 94.64
+        },
+        "PKG-HYD-015": {
+          "status": "quoted",
+          "written": {
+            "price": 16.47,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 14.52,
+          "note": "Printed value struck through; handwritten correction is the valid price"
+        },
+        "PKG-HYD-016": {
+          "status": "quoted",
+          "written": {
+            "price": 119.16,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 105.02
+        },
+        "PKG-HYD-017": {
+          "status": "quoted",
+          "written": {
+            "price": 7.82,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 6.89
+        },
+        "PKG-HYD-018": {
+          "status": "quoted",
+          "written": {
+            "price": 70.89,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 62.48
+        },
+        "PKG-HYD-019": {
+          "status": "quoted",
+          "written": {
+            "price": 37.61,
+            "currency": "INR",
+            "unit": "Sheet"
+          },
+          "expectedNormalisedInr": 33.15
+        },
+        "PKG-HYD-020": {
+          "status": "quoted",
+          "written": {
+            "price": 7.15,
+            "currency": "INR",
+            "unit": "Sheet"
+          },
+          "expectedNormalisedInr": 6.3
+        },
+        "PKG-HYD-021": {
+          "status": "quoted",
+          "written": {
+            "price": 64.16,
+            "currency": "INR",
+            "unit": "Kg"
+          },
+          "expectedNormalisedInr": 56.55
+        },
+        "PKG-HYD-022": {
+          "status": "quoted",
+          "written": {
+            "price": 105.38,
+            "currency": "INR",
+            "unit": "Set"
+          },
+          "expectedNormalisedInr": 92.88
+        },
+        "PKG-HYD-023": {
+          "status": "quoted",
+          "written": {
+            "price": 84.82,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 74.76,
+          "note": "Printed value struck through; handwritten correction is the valid price"
+        },
+        "PKG-HYD-024": {
+          "status": "quoted",
+          "written": {
+            "price": 90.75,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 79.98
+        },
+        "PKG-HYD-025": {
+          "status": "quoted",
+          "written": {
+            "price": 25.08,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 22.1
+        },
+        "PKG-HYD-026": {
+          "status": "quoted",
+          "written": {
+            "price": 537.98,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 474.15
+        },
+        "PKG-HYD-027": {
+          "status": "quoted",
+          "written": {
+            "price": 400.07,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 352.6
+        },
+        "PKG-HYD-028": {
+          "status": "quoted",
+          "written": {
+            "price": 923.97,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 814.35
+        },
+        "PKG-HYD-029": {
+          "status": "quoted",
+          "written": {
+            "price": 27.49,
+            "currency": "INR",
+            "unit": "Set"
+          },
+          "expectedNormalisedInr": 24.23
+        },
+        "PKG-HYD-030": {
+          "status": "quoted",
+          "written": {
+            "price": 33.18,
+            "currency": "INR",
+            "unit": "Set"
+          },
+          "expectedNormalisedInr": 29.24
+        }
+      },
+      "terms": {
+        "payment": "Net 30 days",
+        "leadTimeDays": 10,
+        "freight": "extra 4.0%",
+        "gst": "inclusive 18%",
+        "discount": null,
+        "handwrittenCorrections": [
+          "PKG-HYD-004",
+          "PKG-HYD-015",
+          "PKG-HYD-023"
+        ]
+      }
+    },
+    "V-ECOWRAP": {
+      "file": "RE_RFQ_Hyderabad_Corrugated_Packaging_2026.eml",
+      "format": "eml",
+      "items": {
+        "PKG-HYD-001": {
+          "status": "quoted",
+          "written": {
+            "price": 89.3,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 89.3
+        },
+        "PKG-HYD-002": {
+          "status": "quoted",
+          "written": {
+            "price": 66.96,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 66.96
+        },
+        "PKG-HYD-003": {
+          "status": "not_quoted",
+          "written": null,
+          "expectedNormalisedInr": null
+        },
+        "PKG-HYD-004": {
+          "status": "quoted",
+          "written": {
+            "price": 48.83,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 48.83
+        },
+        "PKG-HYD-005": {
+          "status": "quoted",
+          "written": {
+            "price": 82.72,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 82.72
+        },
+        "PKG-HYD-006": {
+          "status": "quoted",
+          "written": {
+            "price": 125.96,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 125.96
+        },
+        "PKG-HYD-007": {
+          "status": "quoted",
+          "written": {
+            "price": 17.55,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 17.55
+        },
+        "PKG-HYD-008": {
+          "status": "quoted",
+          "written": {
+            "price": 14.24,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 14.24
+        },
+        "PKG-HYD-009": {
+          "status": "historical_reference",
+          "written": null,
+          "expectedNormalisedInr": null,
+          "trapPriceInDocument": 27.2,
+          "note": "Email says 'same rate as last year' - no current price"
+        },
+        "PKG-HYD-010": {
+          "status": "historical_reference",
+          "written": null,
+          "expectedNormalisedInr": null,
+          "trapPriceInDocument": 21.5,
+          "note": "Email says 'same rate as last year' - no current price"
+        },
+        "PKG-HYD-011": {
+          "status": "quoted",
+          "written": {
+            "price": 69.92,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 69.92
+        },
+        "PKG-HYD-012": {
+          "status": "quoted",
+          "written": {
+            "price": 78.12,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 78.12
+        },
+        "PKG-HYD-013": {
+          "status": "quoted",
+          "written": {
+            "price": 53.1,
+            "currency": "INR",
+            "unit": "Box"
+          },
+          "expectedNormalisedInr": 53.1
+        },
+        "PKG-HYD-014": {
+          "status": "not_quoted",
+          "written": null,
+          "expectedNormalisedInr": null
+        },
+        "PKG-HYD-015": {
+          "status": "quoted",
+          "written": {
+            "price": 15.23,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 15.23
+        },
+        "PKG-HYD-016": {
+          "status": "quoted",
+          "written": {
+            "price": 101.48,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 101.48
+        },
+        "PKG-HYD-017": {
+          "status": "quoted",
+          "written": {
+            "price": 7.05,
+            "currency": "INR",
+            "unit": "Piece"
+          },
+          "expectedNormalisedInr": 7.05
+        },
+        "PKG-HYD-018": {
+          "status": "historical_reference",
+          "written": null,
+          "expectedNormalisedInr": null,
+          "trapPriceInDocument": 65,
+          "note": "Email says 'same rate as last year' - no current price"
+        },
+        "PKG-HYD-019": {
+          "status": "quoted",
+          "written": {
+            "price": 8500,
+            "currency": "INR",
+            "unit": "strapped pallet load"
+          },
+          "expectedNormalisedInr": null,
+          "note": "Sheets per pallet not stated - unit unresolved, must be blocked"
+        },
+        "PKG-HYD-020": {
+          "status": "quoted",
+          "written": {
+            "price": 6.5,
+            "currency": "INR",
+            "unit": "Sheet"
+          },
+          "expectedNormalisedInr": 6.5
+        },
+        "PKG-HYD-021": {
+          "status": "quoted",
+          "written": {
+            "price": 57.2,
+            "currency": "INR",
+            "unit": "Kg"
+          },
+          "expectedNormalisedInr": 57.2
+        },
+        "PKG-HYD-022": {
+          "status": "not_quoted",
+          "written": null,
+          "expectedNormalisedInr": null
+        },
+        "PKG-HYD-023": {
+          "status": "not_quoted",
+          "written": null,
+          "expectedNormalisedInr": null
+        },
+        "PKG-HYD-024": {
+          "status": "not_quoted",
+          "written": null,
+          "expectedNormalisedInr": null
+        },
+        "PKG-HYD-025": {
+          "status": "not_quoted",
+          "written": null,
+          "expectedNormalisedInr": null
+        },
+        "PKG-HYD-026": {
+          "status": "quoted",
+          "written": {
+            "price": 479.6,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 479.6
+        },
+        "PKG-HYD-027": {
+          "status": "quoted",
+          "written": {
+            "price": 356.7,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 356.7
+        },
+        "PKG-HYD-028": {
+          "status": "quoted",
+          "written": {
+            "price": 805.2,
+            "currency": "INR",
+            "unit": "Roll"
+          },
+          "expectedNormalisedInr": 805.2
+        },
+        "PKG-HYD-029": {
+          "status": "not_quoted",
+          "written": null,
+          "expectedNormalisedInr": null
+        },
+        "PKG-HYD-030": {
+          "status": "not_quoted",
+          "written": null,
+          "expectedNormalisedInr": null
+        }
+      },
+      "terms": {
+        "payment": "Net 45 Days",
+        "leadTimeDays": 14,
+        "freight": "included (delivered)",
+        "gst": "extra 18%",
+        "discount": null,
+        "counts": {
+          "firmPriced": 18,
+          "unitUnresolved": 1,
+          "historicalReference": 3,
+          "notQuoted": 8
+        }
+      }
+    }
+  }
+}

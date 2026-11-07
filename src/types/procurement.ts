@@ -78,15 +78,30 @@ export interface Vendor {
   questionnaireStatus: 'Completed' | 'Completed (Failed Mandatory)' | 'Partial';
   processingStatus: VendorProcessingStatus;
   extractionConfidencePct: number;
-  validationStatus: 'Pending Extraction' | 'Verified' | 'Exceptions Found' | 'Clarification Requested' | 'Disqualified on Quality';
+  validationStatus: 'Pending Extraction' | 'Awaiting Buyer Review' | 'Verified' | 'Exceptions Found' | 'Clarification Requested' | 'Disqualified on Quality';
   deliveryLeadTimeDays: number;
   paymentTermsQuoted: string;
-  freightPolicy: 'Included (DDP Hyderabad)' | 'Extra (+3.5% Ex-Works)' | 'Extra (+4.0% Freight)';
+  freightPolicy: string;
   freightExtraPct: number;
   footnoteDiscountPct: number;
-  gstPolicy: '18% GST Extra (Standard)' | 'Inclusive of 18% GST';
+  gstPolicy: string;
   clarificationRequested?: boolean;
   clarificationNote?: string;
+  // --- Added in Phase 2 ---
+  /** False when the document did not state a lead time (deliveryLeadTimeDays is then not meaningful). */
+  leadTimeStated?: boolean;
+  /** Facts about the last extraction run for this vendor. */
+  extractionRun?: {
+    model: string;
+    sha256: string;
+    finishedAt: string;
+    inputMode: string;
+    /** Name found inside the document, so a wrong-file upload can be caught. */
+    vendorNameInDocument: string | null;
+    reviewFlags: string[];
+    missingInformation: string[];
+    counts: { total: number; firmPriced: number; priced: number; historicalReference: number; notQuoted: number; notMentioned: number; blocked: number; quotedWithoutPrice: number };
+  };
 }
 
 export type QuoteValidationStatus =
@@ -98,7 +113,26 @@ export type QuoteValidationStatus =
   | 'unknown_unit'
   | 'historical_reference'
   | 'conflicting_values'
-  | 'footnote_discount_applied';
+  | 'footnote_discount_applied'
+  | 'unverified_visual'; // read from an image by AI; cannot be machine-checked against the source
+
+/**
+ * Three separate levels of trust. They must never be collapsed into one.
+ *  ai_extracted     - the model read this value from the document.
+ *  system_validated - deterministic checks passed (cited text found at the cited place, maths ran, no block reasons).
+ *  buyer_verified   - a human looked at the source and confirmed it.
+ */
+export type TrustLevel = 'ai_extracted' | 'system_validated' | 'buyer_verified';
+
+export interface SourceEvidence {
+  documentName: string;
+  kind: 'xlsx_cell' | 'pdf_text' | 'docx_paragraph' | 'email_line' | 'image_region';
+  locator: string;
+  page: number | null;
+  snippet: string;
+  boundingBox: { x: number; y: number; w: number; h: number } | null;
+  check: 'verified_in_source' | 'not_found_in_source' | 'visual_unverified';
+}
 
 export interface VendorQuoteCell {
   itemId: string;
@@ -122,6 +156,25 @@ export interface VendorQuoteCell {
   isComparable: boolean; // False if unknown_unit or historical_reference is unresolved
   conflictSecondaryValueInr?: number;
   exceptionNote?: string;
+  // --- Added in Phase 2 (real extraction). Optional so older code keeps working. ---
+  trust?: TrustLevel;
+  evidence?: SourceEvidence[];
+  /** GST percentage that is INSIDE the quoted price (0 when quoted ex-GST). */
+  gstInclusivePct?: number;
+  /** Plain-text conditions on any discount that was applied. */
+  discountConditions?: string[];
+  /** Reasons the price is blocked from comparison. Empty when usable. */
+  blockReasons?: string[];
+  /** Human-readable explanation of the unit conversion that was applied. */
+  unitExplanation?: string;
+  /** Assumptions the system made that the buyer should be aware of. */
+  assumptions?: string[];
+  /** Where this cell came from. 'seed_demo' cells are NOT extracted from any file. */
+  origin?: 'gemini_extraction' | 'seed_demo';
+  /** Price (INR per standard unit) a buyer typed in or selected during verification. Overrides the extracted value. */
+  buyerConfirmedPriceInr?: number;
+  /** What the system had before a buyer override, kept for the audit trail. */
+  originalExtractedPriceInr?: number | null;
 }
 
 export type ExceptionType =
@@ -154,7 +207,7 @@ export interface ConversionRule {
   id: string;
   vendorId: string;
   affectedItemIds: string[];
-  category: 'Unit of Measure (UOM)' | 'Currency (FX)' | 'Footnote Discount' | 'Freight Normalisation' | 'Tax (GST) Normalisation';
+  category: 'Unit of Measure (UOM)' | 'Currency (FX)' | 'Footnote Discount' | 'Freight Normalisation' | 'Tax (GST) Normalisation' | 'Historical Price Reference';
   originalValueDisplay: string;
   originalUnitOrCurrency: string;
   standardisedValueDisplay: string;
@@ -177,6 +230,8 @@ export interface QuestionnaireQuestion {
 }
 
 export interface VendorQuestionnaireResponse {
+  /** 'sample_input' = demo data supplied with the project, NOT extracted from a vendor file. */
+  origin?: 'sample_input' | 'extracted';
   questionId: string;
   vendorId: string;
   answerText: string;
@@ -206,6 +261,8 @@ export interface ScenarioConfig {
   applyGlobalFootnoteDiscount: boolean; // default true (4.5%)
   standardFreightOverridePct: number | null; // null uses vendor default
   maxLeadTimeDaysFilter: number; // default 21
+  /** For the dual-vendor strategy: the two vendors to split between. Chosen automatically when omitted. */
+  dualVendorIds?: string[];
 }
 
 export interface ScenarioItemAllocation {
@@ -228,6 +285,8 @@ export interface ScenarioVendorSummary {
   avgLeadTimeDays: number;
   qualityQualified: boolean;
   unresolvedExceptionsCount: number;
+  /** False when the vendor's document did not state a lead time. */
+  leadTimeStated?: boolean;
 }
 
 export interface ScenarioResult {
@@ -271,6 +330,14 @@ export interface AnalystMessage {
   dataSources?: string[];
   assumptions?: string[];
   unresolvedRisks?: string[];
+  // --- Added in Phase 2 (real tool-using analyst) ---
+  /** Every table shown came from a tool result, never from the model's own text. */
+  tables?: { title: string; headers: string[]; rows: (string | number)[][] }[];
+  toolTrace?: { id: string; name: string; args: Record<string, unknown>; ok: boolean; error?: string }[];
+  /** Figures in the answer that could not be found in any tool output. */
+  ungroundedFigures?: string[];
+  model?: string;
+  error?: string;
 }
 
 // Phase 2 Real LLM Integration Contracts (Clean Architecture Separation)
